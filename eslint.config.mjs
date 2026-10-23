@@ -4,6 +4,6 @@ import { defineConfig, globalIgnores } from "eslint/config";
 const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
 
 export default defineConfig([
-  ...compat.extends("next/core-web-vitals"),
-  globalIgnores([".next/**", "node_modules/**", "out/**"]),
+  ...compat.extends("next/core-web-vitals.js"),
+  globalIgnores([".next/**", "node_modules/**", "out/**", ".arture-*/**"]),
 ]);
