@@ -17,3 +17,8 @@ coverage/
 
 .vercel
 .env*
+
+temp/
+
+# Ignore files > 100MB to prevent GitHub rejection
+public/videos/Arture Industrial Explainer.mp4

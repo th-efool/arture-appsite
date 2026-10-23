@@ -1,0 +1,26 @@
+# Arture — AI Spatial Operating System for Industrial Workflows
+
+> Enterprise spatial computing platform integrating real-time IoT digital twins, hands-free mixed reality SOP guidance, and frontline AI augmentation for industrial manufacturing and critical infrastructure.
+
+## Platform Summary
+Arture is an AI-powered industrial spatial operating system developed by Arture Technologies Pvt. Ltd., incubated at the Tinkering Lab, Indian Institute of Technology Roorkee (IIT Roorkee), and supported by the Ministry of MSME, Government of India. The platform transforms factory floor operations by connecting frontline technicians, industrial machines, and digital twins through immersive interfaces on Meta Quest, Android XR, Windows, and web interfaces.
+
+## Core Capabilities
+- **Spatial Digital Twins**: Sub-millimeter telemetry projection over live factory equipment and industrial corridors (DMIC, AKIC).
+- **Spatial SOPs & Frontline Guidance**: Step-by-step interactive AR overlays on Meta Quest and Android XR headsets.
+- **VR Industrial Simulation & Training**: Zero-risk procedural training for machinery assembly, high-voltage maintenance, and CNC machine operations.
+- **Remote Expert Telepresence**: Real-time bidirectional spatial annotation and live video streaming for Senior Maintenance Engineers.
+- **Automated Evidence & Logging**: Instant anomaly documentation and predictive maintenance audit trails for ISO 9001 and IATF 16949 compliance.
+
+## Operational Benchmarks
+- **Downtime Mitigation**: 20% to 40% reduction in unplanned downtime.
+- **First-Time Fix Rate**: 30% to 50% improvement in maintenance resolution.
+- **Onboarding Velocity**: 3x faster technician ramp-up compared to traditional classroom paper manuals.
+- **Target Industries**: Automotive manufacturing, machine tool OEMs (ACE Micromatic, Jyoti CNC, BFW, LMW), aerospace, precision engineering, heavy manufacturing, and process plants.
+
+## Institutional Background & Entity Credentials
+- **Legal Entity**: Arture Technologies Pvt. Ltd.
+- **Incubation & R&D Anchor**: Tinkering Lab, Indian Institute of Technology Roorkee, Roorkee, Uttarakhand 247667, India.
+- **Government Recognition**: Supported under Ministry of Micro, Small and Medium Enterprises (MSME) Innovative Scheme.
+- **Canonical Website**: https://arture.ai
+- **Primary Contact**: contact@arture.ai
