@@ -1,6 +1,7 @@
 import { Collection, ObjectId } from "mongodb";
 import { getArtureDb } from "@/lib/db";
 import { machineSchema, maintenanceSchema, technicianSchema } from "@/lib/schemas";
+import { phoneIdentity } from "@/lib/phone";
 
 export type ArtureRole = "admin" | "technician";
 export type ArtureUser = { _id?: ObjectId; email: string; name: string; passwordHash: string; role: ArtureRole; createdAt: Date; updatedAt: Date };
@@ -32,6 +33,7 @@ export const sessions = {
 export const machines = {
   async list() { return (await collection("machines")).find({ archivedAt: null }).sort({ createdAt: -1 }).limit(100).toArray(); },
   async byId(id: string) { return (await collection("machines")).findOne({ _id: new ObjectId(id), archivedAt: null }); },
+  async byAssetCode(assetCode: string) { return (await collection("machines")).findOne({ assetCode: { $regex: `^${assetCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, archivedAt: null }); },
   async create(input: unknown) { const data = machineSchema.parse(input); const now = new Date(); return (await collection("machines")).insertOne({ ...data, archivedAt: null, createdAt: now, updatedAt: now }); },
   async update(id: string, input: unknown) { const data = machineSchema.parse(input); return (await collection("machines")).findOneAndUpdate({ _id: new ObjectId(id), archivedAt: null }, { $set: { ...data, updatedAt: new Date() } }, { returnDocument: "after" }); },
   async archive(id: string) { return (await collection("machines")).updateOne({ _id: new ObjectId(id), archivedAt: null }, { $set: { archivedAt: new Date(), updatedAt: new Date() } }); },
@@ -39,6 +41,7 @@ export const machines = {
 export const technicians = {
   async list() { return (await collection("technicians")).find({}).sort({ active: -1, name: 1 }).limit(100).toArray(); },
   async byId(id: string) { return (await collection("technicians")).findOne({ _id: new ObjectId(id) }); },
+  async matchesByPhone(phone: string) { const identity = phoneIdentity(phone); return (await collection("technicians")).find({}).limit(500).toArray().then((workers) => workers.filter((worker) => phoneIdentity(worker.phone) === identity)); },
   async create(input: unknown) { const data = technicianSchema.parse(input); const now = new Date(); return (await collection("technicians")).insertOne({ ...data, createdAt: now, updatedAt: now }); },
   async update(id: string, input: unknown) { const data = technicianSchema.parse(input); return (await collection("technicians")).findOneAndUpdate({ _id: new ObjectId(id) }, { $set: { ...data, updatedAt: new Date() } }, { returnDocument: "after" }); },
 };

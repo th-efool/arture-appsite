@@ -2,6 +2,22 @@
 
 Arture hackathon workspace: an AI spatial operating-system demo for industrial workflows. It connects machine context, manuals and SOPs, expert knowledge, work evidence, and guided operations. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from root `.env.local`.
 
+## Lightweight integration API
+
+No JWT is required for the demo. Configure `ARTURE_INGEST_KEY` to protect these endpoints with the `x-arture-ingest-key` header; when it is unset, they are open for local hackathon use.
+
+```bash
+# Verify the phone belongs to one registered worker.
+curl "http://localhost:3100/api/workers/lookup?phone=%2B91%2090000%2000001"
+
+# Record that the verified worker completed a task. Use systemId or assetCode.
+curl -X POST http://localhost:3100/api/work-events \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"+91 90000 00001","assetCode":"ATR-DEMO-001","task":"Completed spindle inspection","details":"Lubrication and visual inspection complete.","minutesSpent":30}'
+```
+
+The lookup returns the worker name or `404`. Work events are stored in the Arture maintenance/event timeline, linked to the matched worker and connected system.
+
 ## Isolated configuration
 
 1. Copy `.env.example` to `.env.local` in this repository root.
