@@ -1,6 +1,7 @@
 import { hashPassword } from "../src/lib/password";
 import { users } from "../src/lib/repositories";
 import { validateArtureEnvironment } from "../src/lib/env";
+import { closeArtureDb } from "../src/lib/db";
 
 async function main() {
   const environment = validateArtureEnvironment();
@@ -13,4 +14,4 @@ async function main() {
   await users.create({ email, name: process.env.ARTURE_SEED_ADMIN_NAME?.trim() || "Arture Admin", passwordHash: await hashPassword(password), role: "admin" });
   console.log(`Admin created in ${environment.mongodbDatabase}.`);
 }
-main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });
+main().catch((error: unknown) => { console.error(error); process.exitCode = 1; }).finally(closeArtureDb);

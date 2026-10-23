@@ -1,6 +1,5 @@
-import "server-only";
-
 const ARTURE_DATABASE_NAME = /^arture_[a-z0-9_]+$/i;
+type EnvironmentSource = Record<string, string | undefined>;
 
 export type ArtureEnvironment = {
   mongodbUri: string;
@@ -23,7 +22,7 @@ function validateMongoUri(uri: string): string {
   return uri;
 }
 
-export function validateArtureEnvironment(source: NodeJS.ProcessEnv = process.env): ArtureEnvironment {
+export function validateArtureEnvironment(source: EnvironmentSource = process.env): ArtureEnvironment {
   const mongodbDatabase = required(source.ARTURE_MONGODB_DB, "ARTURE_MONGODB_DB");
   if (!ARTURE_DATABASE_NAME.test(mongodbDatabase)) {
     throw new Error("ARTURE_MONGODB_DB must start with 'arture_'.");

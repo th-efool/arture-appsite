@@ -12,7 +12,8 @@
     "test": "tsx --test src/**/*.test.ts",
     "validate:env": "tsx scripts/validate-env.ts",
     "db:indexes": "tsx scripts/db-indexes.ts",
-    "db:seed": "tsx scripts/db-seed.ts"
+    "db:seed": "tsx scripts/db-seed.ts",
+    "db:seed:sample": "tsx scripts/db-seed-sample.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

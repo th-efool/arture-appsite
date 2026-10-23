@@ -1,5 +1,3 @@
-import "server-only";
-
 import { compare, hash } from "bcryptjs";
 
 export function hashPassword(password: string) {

@@ -1,5 +1,3 @@
-import "server-only";
-
 import { Db, MongoClient } from "mongodb";
 import { validateArtureEnvironment } from "@/lib/env";
 
@@ -22,4 +20,10 @@ export async function getArtureDb(): Promise<Db> {
     });
   }
   return global.artureMongoClient.db(environment.mongodbDatabase);
+}
+
+export async function closeArtureDb(): Promise<void> {
+  if (!global.artureMongoClient) return;
+  await global.artureMongoClient.close();
+  global.artureMongoClient = undefined;
 }

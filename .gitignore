@@ -1,3 +1,4 @@
 .env
+.arture-node_modules-recovery/
 .env
 app/.env.example

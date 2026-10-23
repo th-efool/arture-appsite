@@ -1,32 +1,65 @@
 # Arture demo
 
-Standalone Next.js foundation for the Arture hackathon demo.
+Standalone Next.js equipment-register demo. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from `app/.env.local`.
 
-## Safety boundary
+## Isolated configuration
 
-- Existing root `.env` and `sample.html` stay untouched.
-- This app reads only `ARTURE_*` variables from `app/.env.local`.
-- `ARTURE_MONGODB_DB` must start with `arture_`; environment validation rejects every other database name before database code is added.
-- Database access uses a max pool of five connections and only names beginning `arture_`.
-- MongoDB URI stays server-only. Never use `NEXT_PUBLIC_` for credentials.
-- Collections, cookies, and seed data use `arture_` names.
+1. Copy `.env.example` to `.env.local` inside `app/`.
+2. Create `arture_demo_dev` and a new MongoDB user limited to that database only. Do not reuse another application's unrestricted user or change its credentials.
+3. Set `ARTURE_MONGODB_URI` to restricted user's URI, `ARTURE_MONGODB_DB=arture_demo_dev`, and new random `ARTURE_AUTH_SECRET`.
+4. Keep `ARTURE_DEMO_MODE=true`. No `NEXT_PUBLIC_*` variable may contain secret.
 
-## Local setup
+Environment validation refuses databases outside `arture_*`. App uses `arture_` collections, `arture_documents` GridFS bucket, `arture_session` cookie, maximum MongoDB pool size five.
 
-1. Copy `.env.example` to `.env.local`.
-2. Create a new MongoDB user restricted only to `arture_demo_dev` (or another `arture_` database). Do not reuse unrestricted credentials from another app.
-3. Put its URI in `.env.local`; keep root `.env` unchanged.
-4. Use a new, random `ARTURE_AUTH_SECRET`.
-5. Run `npm install`, then `npm run dev`.
+## Local run
 
-## Database commands
+```powershell
+cd C:\Users\Dell\Documents\arture-appsite\app
+npm install
+npm run validate:env
+npm run dev
+```
 
-`npm run validate:env` validates Arture namespace locally and makes no network call.
+Open `http://localhost:3100`.
 
-`npm run db:indexes` creates only indexes on `arture_*` collections. It connects to database configured in `.env.local`.
+## Remote database preparation
 
-`npm run db:seed` creates one admin only when `ARTURE_SEED_ADMIN_EMAIL` and `ARTURE_SEED_ADMIN_PASSWORD` are set. It is idempotent and does not overwrite existing users. Run `npm run db:indexes` first.
+Run only after `.env.local` points to dedicated Arture database and restricted Arture user:
 
-Login endpoint: `POST /api/auth/login` with JSON `{ "email", "password" }`. No public registration and no hardcoded password. `GET /api/auth/session` returns current user; `POST /api/auth/logout` expires session.
+```powershell
+cd C:\Users\Dell\Documents\arture-appsite\app
+npm run validate:env
+npm run db:indexes
+$env:ARTURE_SEED_ADMIN_EMAIL="admin@arture.demo"
+$env:ARTURE_SEED_ADMIN_PASSWORD="use-a-new-12-character-minimum-password"
+$env:ARTURE_SEED_ADMIN_NAME="Arture Admin"
+npm run db:seed
+$env:ARTURE_SEED_SAMPLE_DATA="true"
+npm run db:seed:sample
+```
 
-Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` before deployment.
+`db:indexes` creates indexes only on `arture_*` collections. `db:seed` creates admin only when email absent. `db:seed:sample` opt-in inserts three `ATR-DEMO-*` machines, three technicians, linked maintenance logs, explicit `seedKey` values. It uses `$setOnInsert`; existing records never overwritten. If user record occupies demo machine or technician identifier, no sample maintenance log attaches to it.
+
+No script deletes data. Do not run cleanup command against connection string lacking Arture-only database user.
+
+## Verification
+
+```powershell
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+Admins add machines/technicians, upload/delete documents, log maintenance. Technicians view documents/log maintenance, cannot see document upload/delete controls; server routes enforce this too.
+
+## Recovery and cleanup
+
+To reset demo data, first export or snapshot `arture_demo_dev` if it contains retained work. Then delete only exact Arture database from MongoDB Atlas or `mongosh`, authenticated as dedicated Arture user:
+
+```javascript
+use arture_demo_dev
+db.dropDatabase()
+```
+
+This removes Arture collections and `arture_documents` GridFS data inside that database. It cannot affect another application database when restricted user is used. Re-run preparation commands to recreate indexes, admin, demo data. Delete dedicated Arture MongoDB user separately when demo is retired.
