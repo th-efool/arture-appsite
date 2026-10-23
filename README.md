@@ -1,6 +1,6 @@
 # Arture demo
 
-Standalone Next.js equipment-register demo. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from root `.env.local`.
+Arture hackathon workspace: an AI spatial operating-system demo for industrial workflows. It connects machine context, manuals and SOPs, expert knowledge, work evidence, and guided operations. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from root `.env.local`.
 
 ## Isolated configuration
 

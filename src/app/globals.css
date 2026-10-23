@@ -11,7 +11,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible { 
 .shell { min-height:100dvh; display:grid; grid-template-columns:272px minmax(0,1fr); }
 .rail { position:sticky; top:0; min-height:100dvh; padding:30px 18px 22px; display:flex; flex-direction:column; background:var(--navy); color:#dce5e7; }
 .brand { display:flex; align-items:center; gap:11px; color:#fff; font-size:15px; font-weight:800; letter-spacing:.09em; }
-.brand-mark { width:29px; height:29px; display:grid; place-items:center; padding-top:5px; color:#fff; background:var(--orange); clip-path:polygon(50% 0,100% 100%,0 100%); }
+.brand-logo { width:36px; height:36px; flex:0 0 auto; border-radius:9px; }
 .brand-sub { display:block; margin-top:3px; color:#9fb1b8; font-size:8px; letter-spacing:.18em; }
 .rail-label,.eyebrow { margin:0; color:var(--steel); font-size:10px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
 .rail-label { margin:62px 10px 14px; color:#91a5ac; }
