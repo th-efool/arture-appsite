@@ -1,10 +1,10 @@
 # Arture demo
 
-Standalone Next.js equipment-register demo. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from `app/.env.local`.
+Standalone Next.js equipment-register demo. Root `.env` and `sample.html` stay untouched. This app only reads `ARTURE_*` values from root `.env.local`.
 
 ## Isolated configuration
 
-1. Copy `.env.example` to `.env.local` inside `app/`.
+1. Copy `.env.example` to `.env.local` in this repository root.
 2. Create `arture_demo_dev` and a new MongoDB user limited to that database only. Do not reuse another application's unrestricted user or change its credentials.
 3. Set `ARTURE_MONGODB_URI` to restricted user's URI, `ARTURE_MONGODB_DB=arture_demo_dev`, and new random `ARTURE_AUTH_SECRET`.
 4. Keep `ARTURE_DEMO_MODE=true`. No `NEXT_PUBLIC_*` variable may contain secret.
