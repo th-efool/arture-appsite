@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 export function VisionCTA() {
@@ -25,13 +26,13 @@ export function VisionCTA() {
 
             {/* CTA Buttons */}
             <div className="mt-7 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                <a
-                    href="#contact"
+                <Link
+                    href="/login"
                     className="group inline-flex items-center justify-center gap-2 bg-[#F59E38] hover:bg-[#E88819] text-black text-sm sm:text-base font-extrabold px-8 py-3.5 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 hover:scale-[1.02] w-full sm:w-auto"
                 >
-                    Request a Demo
+                    Login / Signup
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" strokeWidth={2.5} />
-                </a>
+                </Link>
 
                 <a
                     href="#contact"

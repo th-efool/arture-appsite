@@ -54,24 +54,16 @@ export function HeroNavbar() {
                         </ul>
                     </nav>
 
-                    {/* Header CTA Buttons */}
+                    {/* Header CTA: Login / Signup Button */}
                     <div className="flex items-center gap-3 shrink-0">
                         <Link
-                            href="/workspace"
-                            aria-label="Open Arture Spatial Workspace"
+                            href="/login"
+                            aria-label="Arture Login or Sign Up"
                             className="inline-flex h-10 sm:h-12 xl:h-14 2xl:h-16 items-center rounded-2xl 2xl:rounded-3xl bg-[#F59E38] hover:bg-[#E88819] px-4 sm:px-7 xl:px-9 2xl:px-11 text-xs sm:text-base xl:text-lg 2xl:text-xl font-bold text-black shadow-lg shadow-orange-500/20 transition-all duration-300 hover:scale-[1.02]"
                         >
-                            Open Workspace
+                            Login / Signup
                             <span className="ml-2 text-sm sm:text-lg xl:text-xl">&rarr;</span>
                         </Link>
-
-                        <a
-                            href="#vision"
-                            aria-label="Request Arture Demo"
-                            className="hidden sm:inline-flex h-10 sm:h-12 xl:h-14 2xl:h-16 items-center rounded-2xl 2xl:rounded-3xl border border-white/20 hover:border-white/50 px-4 sm:px-6 xl:px-8 text-xs sm:text-base xl:text-lg font-medium text-white transition-all duration-300 hover:bg-white/10"
-                        >
-                            Request Demo
-                        </a>
                     </div>
 
                 </div>
