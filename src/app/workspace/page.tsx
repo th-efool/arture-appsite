@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 type Status = "operational" | "service_due" | "offline";
 type Machine = { id: string; assetCode: string; name: string; model: string; location: string; status: Status };
@@ -27,7 +28,9 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [loadingSession, setLoadingSession] = useState(true);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [techs, setTechs] = useState<Tech[]>([]);
   const [view, setView] = useState<"dashboard" | "machines" | "technicians" | "detail">("dashboard");
@@ -55,8 +58,11 @@ export default function Home() {
     try {
       setError("");
       const session = await api<{ user: User | null }>("/api/auth/session");
+      if (!session.user) {
+        router.replace("/login");
+        return;
+      }
       setUser(session.user);
-      if (!session.user) return;
       const [machineResult, technicianResult] = await Promise.all([
         api<{ machines: Machine[] }>("/api/machines"),
         api<{ technicians: Tech[] }>("/api/technicians")
@@ -66,8 +72,11 @@ export default function Home() {
     } catch (cause) {
       setUser(null);
       setError(cause instanceof Error ? cause.message : "Could not load Arture.");
+      router.replace("/login");
+    } finally {
+      setLoadingSession(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void load();
@@ -144,9 +153,19 @@ export default function Home() {
   const signOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    router.replace("/login");
   };
 
-  if (!user) return <Login retry={load} error={error} />;
+  if (loadingSession || !user) {
+    return (
+      <main className="shell flex items-center justify-center min-h-screen bg-[#08090c] text-white">
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100%", gap: 16 }}>
+          <div style={{ width: 36, height: 36, border: "3px solid rgba(245, 158, 56, 0.2)", borderTopColor: "#F59E38", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          <p style={{ color: "#94a3b8", fontSize: 14 }}>Redirecting to secure login...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="shell">
@@ -1319,90 +1338,6 @@ function LogForm({
   );
 }
 
-/* =======================================================
-   AUTHENTICATION / SIGN IN
-   ======================================================= */
-function Login({ retry, error }: { retry: () => void; error: string }) {
-  const [message, setMessage] = useState(error);
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    try {
-      await api("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: form.get("email"),
-          password: form.get("password")
-        })
-      });
-      retry();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Sign in failed.");
-    }
-  };
-
-  return (
-    <main className="auth-shell">
-      <div className="auth-container">
-        <div className="auth-brand-side">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Image src="/arture-logo.svg" alt="Arture" width={40} height={40} />
-              <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: "0.08em" }}>ARTURE</span>
-            </div>
-            <p className="eyebrow" style={{ color: "#fb923c", marginTop: 32 }}>AI SPATIAL OPERATING SYSTEM</p>
-            <h1>Industrial expertise, directly in the field.</h1>
-            <p style={{ marginTop: 18, color: "#94a3b8", fontSize: 15, lineHeight: 1.6 }}>
-              Turn engineering manuals, SOPs, and expert institutional knowledge into hands-free AR workflows,
-              live digital twins, and voice-guided maintenance.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 24, fontSize: 13, color: "#cbd5e1" }}>
-            <span>&check; 3D Digital Twins</span>
-            <span>&check; Realtime Voice AI</span>
-            <span>&check; AR Headset Companion</span>
-          </div>
-        </div>
-
-        <div className="auth-form-side">
-          <h2 style={{ margin: "0 0 6px 0", fontSize: 26, fontWeight: 800 }}>Enter Spatial Workspace</h2>
-          <p style={{ margin: "0 0 24px 0", color: "#64748b", fontSize: 14 }}>
-            Sign in with your organizational operator credentials.
-          </p>
-
-          <form onSubmit={submit} className="dialog-form">
-            <label>
-              Email Address
-              <input name="email" type="email" autoComplete="email" defaultValue="admin@arture.demo" required />
-            </label>
-            <label>
-              Password
-              <input name="password" type="password" autoComplete="current-password" defaultValue="Arture-Demo-2026!" required />
-            </label>
-
-            {message && (
-              <p style={{ margin: 0, padding: 10, borderRadius: 8, background: "#fee2e2", color: "#b91c1c", fontSize: 13 }}>
-                {message}
-              </p>
-            )}
-
-            <button className="btn-primary btn-orange" style={{ width: "100%", justifyContent: "center", height: 46 }}>
-              Open Workspace &rarr;
-            </button>
-          </form>
-
-          <aside className="demo-account-card">
-            <p>Demo Workspace Access</p>
-            <code>admin@arture.demo</code>
-            <code>Arture-Demo-2026!</code>
-          </aside>
-        </div>
-      </div>
-    </main>
-  );
-}
 
 /* =======================================================
    STATUS PILL HELPER
