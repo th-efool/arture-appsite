@@ -29,8 +29,15 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
 
 export default function Home() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("arture_user");
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
   const [machines, setMachines] = useState<Machine[]>([]);
   const [techs, setTechs] = useState<Tech[]>([]);
   const [view, setView] = useState<"dashboard" | "machines" | "technicians" | "detail">("dashboard");
@@ -59,10 +66,17 @@ export default function Home() {
       setError("");
       const session = await api<{ user: User | null }>("/api/auth/session");
       if (!session.user) {
+        try { sessionStorage.removeItem("arture_user"); } catch {}
+        setUser(null);
         router.replace("/login");
         return;
       }
       setUser(session.user);
+      try {
+        sessionStorage.setItem("arture_user", JSON.stringify(session.user));
+      } catch {}
+
+      // Fetch operational data in parallel without blocking user view
       const [machineResult, technicianResult] = await Promise.all([
         api<{ machines: Machine[] }>("/api/machines"),
         api<{ technicians: Tech[] }>("/api/technicians")
@@ -70,13 +84,12 @@ export default function Home() {
       setMachines(machineResult.machines);
       setTechs(technicianResult.technicians);
     } catch (cause) {
-      setUser(null);
+      if (!user) {
+        router.replace("/login");
+      }
       setError(cause instanceof Error ? cause.message : "Could not load Arture.");
-      router.replace("/login");
-    } finally {
-      setLoadingSession(false);
     }
-  }, [router]);
+  }, [router, user]);
 
   useEffect(() => {
     void load();
@@ -151,18 +164,22 @@ export default function Home() {
   };
 
   const signOut = async () => {
+    try { sessionStorage.removeItem("arture_user"); } catch {}
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     router.replace("/login");
   };
 
-  if (loadingSession || !user) {
+  if (!user) {
     return (
-      <main className="shell flex items-center justify-center min-h-screen bg-[#08090c] text-white">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", width: "100%", gap: 16 }}>
-          <div style={{ width: 36, height: 36, border: "3px solid rgba(245, 158, 56, 0.2)", borderTopColor: "#F59E38", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-          <p style={{ color: "#94a3b8", fontSize: 14 }}>Redirecting to secure login...</p>
-        </div>
+      <main className="shell" style={{ minHeight: "100vh" }}>
+        <aside className="rail" />
+        <section className="workspace" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ width: 32, height: 32, margin: "0 auto 14px", border: "3px solid #e2e8f0", borderTopColor: "#f97316", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
+            <p style={{ color: "var(--ink-secondary)", fontSize: 13, fontWeight: 600 }}>Loading Arture Workspace...</p>
+          </div>
+        </section>
       </main>
     );
   }

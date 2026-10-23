@@ -12,12 +12,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Preload workspace route chunk in background
+    router.prefetch("/workspace");
+
     // Check if session already exists
     fetch("/api/auth/session")
       .then((res) => res.json())
       .then((data) => {
         if (data.user) {
-          router.push("/workspace");
+          try {
+            sessionStorage.setItem("arture_user", JSON.stringify(data.user));
+          } catch {}
+          router.replace("/workspace");
         }
       })
       .catch(() => {});
@@ -39,6 +45,11 @@ export default function LoginPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Authentication failed.");
+      if (data.user) {
+        try {
+          sessionStorage.setItem("arture_user", JSON.stringify(data.user));
+        } catch {}
+      }
       router.push("/workspace");
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Sign in failed.");
