@@ -11,6 +11,7 @@ coverage/
 .arture-next-recovery/
 .arture-app-next-recovery/
 .arture-app-recovery/
+.arture-*/
 .vercel/
 .env
 app/.env.example
