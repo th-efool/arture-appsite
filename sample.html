@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Machinery Manager</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for standard corporate icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb', // Corporate primary blue
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Clean, professional scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f9fafb; border-left: 1px solid #e5e7eb; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+        /* Toast animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .toast-enter { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-exit { animation: fadeOut 0.3s ease forwards; }
+
+        /* Form input standard overrides to ensure border consistency */
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 1px #3b82f6 !important;
+        }
+    </style>
+</head>
+<body class="h-full overflow-hidden text-gray-800 flex bg-gray-50">
+
+    <!-- AUTH VIEW -->
+    <div id="login-view" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-100 transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 w-full max-w-md">
+            <div class="flex justify-center mb-6 text-brand-600">
+                <i class="fa-solid fa-industry text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-semibold text-center text-gray-900 mb-2">Company Login</h2>
+            <p class="text-sm text-gray-500 text-center mb-6">Enter your credentials to access the dashboard.</p>
+            
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Work Email</label>
+                    <input type="email" required value="admin@company.com" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" required value="password" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500 transition-colors">
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors">
+                        Sign In
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP VIEW (Hidden until login) -->
+    <div id="app-view" class="hidden h-full w-full flex">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 h-full">
+            <div class="h-16 flex items-center px-6 border-b border-gray-200 shrink-0">
+                <i class="fa-solid fa-industry text-brand-600 text-xl mr-3"></i>
+                <span class="text-base font-semibold text-gray-900 tracking-tight">EquipManage Pro</span>
+            </div>
+            
+            <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Menu</div>
+                
+                <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    <i class="fa-solid fa-chart-line w-5 mr-2 text-gray-400"></i> Dashboard
+                </button>
+                
+                <button onclick="navigate('machines')" id="nav-machines" class="nav-btn w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    <i class="fa-solid fa-cogs w-5 mr-2 text-gray-400"></i> Machines
+                </button>
+                
+                <button onclick="navigate('technicians')" id="nav-technicians" class="nav-btn w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    <i class="fa-solid fa-users-cog w-5 mr-2 text-gray-400"></i> Technicians
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-200">
+                <button onclick="handleLogout()" class="w-full flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                    <i class="fa-solid fa-sign-out-alt w-5 mr-2 text-gray-400"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col min-w-0 bg-gray-50 overflow-hidden h-full">
+            
+            <!-- Top Header -->
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
+                <h1 id="page-title" class="text-lg font-medium text-gray-900">Dashboard</h1>
+                
+                <div class="flex items-center gap-4">
+                    <button class="text-gray-400 hover:text-gray-500">
+                        <i class="fa-solid fa-bell"></i>
+                    </button>
+                    <div class="h-5 w-px bg-gray-300"></div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold">
+                            AD
+                        </div>
+                        <span class="text-sm font-medium text-gray-700">Admin User</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Scrollable Content Container -->
+            <div class="flex-1 overflow-y-auto p-8 relative">
+                
+                <!-- SECTION: DASHBOARD -->
+                <div id="section-dashboard" class="page-section hidden max-w-7xl mx-auto space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Stat Card 1 -->
+                        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex items-center">
+                            <div class="p-3 rounded-md bg-blue-50 text-blue-600 mr-4">
+                                <i class="fa-solid fa-cogs text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Machines</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="dash-total-machines">0</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Stat Card 2 -->
+                        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex items-center">
+                            <div class="p-3 rounded-md bg-green-50 text-green-600 mr-4">
+                                <i class="fa-solid fa-check-circle text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Operational Status</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="dash-active-machines">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 3 -->
+                        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex items-center">
+                            <div class="p-3 rounded-md bg-purple-50 text-purple-600 mr-4">
+                                <i class="fa-solid fa-users text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Technicians</p>
+                                <p class="text-2xl font-semibold text-gray-900" id="dash-total-techs">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-base font-medium text-gray-900">Recent System Activity</h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="text-sm text-gray-500">Navigate to Machines or Technicians to manage your fleet and workforce.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION: MACHINES LIST -->
+                <div id="section-machines" class="page-section hidden max-w-7xl mx-auto space-y-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-lg font-medium text-gray-900">Equipment Inventory</h2>
+                        <button onclick="openModal('machine-modal')" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+                            <i class="fa-solid fa-plus mr-2"></i> Add Machine
+                        </button>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Name</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model/Type</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="machines-tbody" class="bg-white divide-y divide-gray-200 text-sm">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION: MACHINE DETAILED VIEW -->
+                <div id="section-machine-detail" class="page-section hidden max-w-7xl mx-auto space-y-6">
+                    <!-- Detail Header -->
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <button onclick="navigate('machines')" class="text-sm font-medium text-brand-600 hover:text-brand-700 mb-3 flex items-center">
+                                    <i class="fa-solid fa-arrow-left mr-1"></i> Back to Machines
+                                </button>
+                                <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                                    <span id="det-machine-name">Machine Name</span>
+                                    <span id="det-machine-status" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">Active</span>
+                                </h2>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500 font-mono" id="det-machine-id">MAC-000</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-t border-gray-100 pt-4">
+                            <div><span class="text-gray-500 font-medium">Model:</span> <span class="text-gray-900 ml-1" id="det-machine-model">-</span></div>
+                            <div><span class="text-gray-500 font-medium">Location:</span> <span class="text-gray-900 ml-1" id="det-machine-loc">-</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs & Content -->
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
+                        <!-- Tab Headers -->
+                        <div class="border-b border-gray-200 flex">
+                            <button onclick="switchDetailTab('logs')" id="tab-btn-logs" class="px-6 py-3 border-b-2 border-brand-600 text-brand-600 text-sm font-medium bg-gray-50 transition-colors">
+                                Maintenance Logs
+                            </button>
+                            <button onclick="switchDetailTab('docs')" id="tab-btn-docs" class="px-6 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors">
+                                Procedures & Manuals
+                            </button>
+                        </div>
+
+                        <!-- Tab Body: Logs -->
+                        <div id="tab-logs" class="p-6 block">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-base font-medium text-gray-900">Service History</h3>
+                                <button onclick="openLogModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+                                    <i class="fa-solid fa-plus mr-1.5 text-gray-400"></i> Add Log
+                                </button>
+                            </div>
+                            <div class="overflow-hidden border border-gray-200 rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Technician</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time Spent</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Work Performed</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="logs-tbody" class="bg-white divide-y divide-gray-200 text-sm">
+                                        <!-- Populated via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab Body: Docs -->
+                        <div id="tab-docs" class="p-6 hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-base font-medium text-gray-900">Attached Documents</h3>
+                                <button onclick="openDocModal()" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+                                    <i class="fa-solid fa-upload mr-1.5 text-gray-400"></i> Upload PDF
+                                </button>
+                            </div>
+                            <div class="overflow-hidden border border-gray-200 rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10">Type</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document Name</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Added</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                            <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="docs-tbody" class="bg-white divide-y divide-gray-200 text-sm">
+                                        <!-- Populated via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION: TECHNICIANS -->
+                <div id="section-technicians" class="page-section hidden max-w-7xl mx-auto space-y-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-lg font-medium text-gray-900">Technician Directory</h2>
+                        <button onclick="openModal('tech-modal')" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+                            <i class="fa-solid fa-plus mr-2"></i> Add Technician
+                        </button>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialty</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="techs-tbody" class="bg-white divide-y divide-gray-200 text-sm">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    
+    <!-- Machine Modal -->
+    <div id="machine-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 id="machine-modal-title" class="text-lg font-medium text-gray-900">Add Machine</h3>
+                <button onclick="closeModal('machine-modal')" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <form id="machine-form" onsubmit="saveMachine(event)" class="p-6 space-y-4">
+                <input type="hidden" id="mach-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Machine Name</label>
+                    <input type="text" id="mach-name" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Model / Type</label>
+                    <input type="text" id="mach-model" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Location</label>
+                    <input type="text" id="mach-location" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="mach-status" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                        <option value="Active">Active</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                    <button type="button" onclick="closeModal('machine-modal')" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm font-medium shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm">Save Machine</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Technician Modal -->
+    <div id="tech-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 id="tech-modal-title" class="text-lg font-medium text-gray-900">Add Technician</h3>
+                <button onclick="closeModal('tech-modal')" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <form id="tech-form" onsubmit="saveTechnician(event)" class="p-6 space-y-4">
+                <input type="hidden" id="tech-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="tech-name" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Specialty</label>
+                    <input type="text" id="tech-specialty" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input type="text" id="tech-phone" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                    <button type="button" onclick="closeModal('tech-modal')" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm font-medium shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm">Save Technician</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Log Modal -->
+    <div id="log-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-medium text-gray-900">Record Maintenance Log</h3>
+                <button onclick="closeModal('log-modal')" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <form id="log-form" onsubmit="saveLog(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Technician</label>
+                    <select id="log-tech-select" required class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Time Spent (Hours)</label>
+                    <input type="number" id="log-time" step="0.5" min="0.5" required placeholder="e.g., 2.5" class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Work Performed</label>
+                    <textarea id="log-work" rows="3" required placeholder="Describe maintenance or repairs done..." class="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-brand-500 focus:border-brand-500"></textarea>
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                    <button type="button" onclick="closeModal('log-modal')" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm font-medium shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm">Save Log</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div id="doc-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-medium text-gray-900">Upload Manual / Procedure</h3>
+                <button onclick="closeModal('doc-modal')" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <form id="doc-form" onsubmit="saveDoc(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Select File (PDF)</label>
+                    <input type="file" id="doc-file" accept=".pdf" required class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                    <button type="button" onclick="closeModal('doc-modal')" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm font-medium shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+    <script>
+        // --- State Management ---
+        const MOCK_DATA_KEY = 'b2b_machinery_app_data';
+        const AUTH_KEY = 'b2b_machinery_auth';
+
+        let appData = {
+            machines: [],
+            technicians: []
+        };
+        let currentViewMachineId = null;
+
+        const defaultSeedData = {
+            machines: [
+                {
+                    id: 'MAC-101', name: 'Industrial Lathe', model: 'ProTurn 500', location: 'Floor 1, Zone A', status: 'Active',
+                    logs: [ { id: 1, date: '2023-10-01', techName: 'John Doe', timeSpent: '2.5', workDone: 'Routine spindle lubrication and bearing check.' } ],
+                    docs: [ 
+                        { id: 1, name: 'ProTurn_500_Manual.pdf', date: '2023-01-15', size: '4.2 MB' },
+                        { id: 2, name: 'Safety_Guidelines_V2.pdf', date: '2023-06-20', size: '1.1 MB' }
+                    ]
+                },
+                {
+                    id: 'MAC-102', name: 'CNC Router', model: 'WoodMaster CNC', location: 'Floor 2, Zone B', status: 'Maintenance',
+                    logs: [], docs: []
+                }
+            ],
+            technicians: [
+                { id: 'TEC-001', name: 'John Doe', specialty: 'Mechanical Systems', phone: '555-0101' },
+                { id: 'TEC-002', name: 'Jane Smith', specialty: 'Electrical Systems', phone: '555-0102' }
+            ]
+        };
+
+        // --- Initialization ---
+        function initApp() {
+            // Load or seed data
+            const stored = localStorage.getItem(MOCK_DATA_KEY);
+            if (stored) {
+                appData = JSON.parse(stored);
+            } else {
+                appData = JSON.parse(JSON.stringify(defaultSeedData));
+                saveData();
+            }
+
+            // Check Auth
+            if (localStorage.getItem(AUTH_KEY) === 'true') {
+                showApp();
+            } else {
+                showLogin();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem(MOCK_DATA_KEY, JSON.stringify(appData));
+        }
+
+        // --- Auth & Navigation ---
+        function handleLogin(e) {
+            e.preventDefault();
+            localStorage.setItem(AUTH_KEY, 'true');
+            showApp();
+            showToast('Successfully logged in', 'success');
+        }
+
+        function handleLogout() {
+            localStorage.removeItem(AUTH_KEY);
+            showLogin();
+            showToast('Logged out successfully', 'success');
+        }
+
+        function showLogin() {
+            document.getElementById('login-view').classList.remove('hidden');
+            document.getElementById('app-view').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            navigate('dashboard');
+        }
+
+        function navigate(viewId) {
+            // Hide all sections
+            document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
+            
+            // Remove active state from nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-gray-100', 'text-gray-900', 'border-l-4', 'border-brand-600', 'pl-1');
+                btn.classList.add('text-gray-600', 'px-2');
+            });
+
+            // Handle specific view rendering
+            if (viewId === 'dashboard') {
+                document.getElementById('section-dashboard').classList.remove('hidden');
+                document.getElementById('page-title').innerText = 'Dashboard Overview';
+                setActiveNav('nav-dashboard');
+                renderDashboard();
+            } else if (viewId === 'machines') {
+                document.getElementById('section-machines').classList.remove('hidden');
+                document.getElementById('page-title').innerText = 'Equipment Inventory';
+                setActiveNav('nav-machines');
+                renderMachinesTable();
+            } else if (viewId === 'technicians') {
+                document.getElementById('section-technicians').classList.remove('hidden');
+                document.getElementById('page-title').innerText = 'Technician Directory';
+                setActiveNav('nav-technicians');
+                renderTechsTable();
+            }
+        }
+
+        function setActiveNav(navId) {
+            const btn = document.getElementById(navId);
+            if(btn) {
+                btn.classList.remove('text-gray-600', 'px-2');
+                btn.classList.add('bg-gray-100', 'text-gray-900', 'border-l-4', 'border-brand-600', 'pl-1');
+            }
+        }
+
+        // --- STREAMING_CHUNK:Implementing UI Rendering Functions... ---
+        // --- Rendering ---
+        function renderDashboard() {
+            document.getElementById('dash-total-machines').innerText = appData.machines.length;
+            const active = appData.machines.filter(m => m.status === 'Active').length;
+            document.getElementById('dash-active-machines').innerText = active;
+            document.getElementById('dash-total-techs').innerText = appData.technicians.length;
+        }
+
+        function renderMachinesTable() {
+            const tbody = document.getElementById('machines-tbody');
+            tbody.innerHTML = '';
+            
+            if (appData.machines.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No machines found. Add one to get started.</td></tr>`;
+                return;
+            }
+
+            appData.machines.forEach(m => {
+                let badgeClass = m.status === 'Active' ? 'bg-green-100 text-green-800' : (m.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800');
+                
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-xs">${m.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${m.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">${m.model}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">${m.location}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeClass}">${m.status}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="viewMachineDetails('${m.id}')" class="text-brand-600 hover:text-brand-900 mr-3" title="View Details"><i class="fa-solid fa-eye"></i></button>
+                        <button onclick="editMachine('${m.id}')" class="text-gray-500 hover:text-gray-700 mr-3" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                        <button onclick="deleteMachine('${m.id}')" class="text-red-500 hover:text-red-700" title="Delete"><i class="fa-solid fa-trash-alt"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderTechsTable() {
+            const tbody = document.getElementById('techs-tbody');
+            tbody.innerHTML = '';
+            
+            if (appData.technicians.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No technicians found.</td></tr>`;
+                return;
+            }
+
+            appData.technicians.forEach(t => {
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-xs">${t.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${t.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">${t.specialty}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">${t.phone}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editTechnician('${t.id}')" class="text-gray-500 hover:text-gray-700 mr-3" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                        <button onclick="deleteTechnician('${t.id}')" class="text-red-500 hover:text-red-700" title="Delete"><i class="fa-solid fa-trash-alt"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- STREAMING_CHUNK:Implementing Machine Detailed View Logic... ---
+        // --- Machine Detailed View ---
+        function viewMachineDetails(id) {
+            const machine = appData.machines.find(m => m.id === id);
+            if (!machine) return;
+            
+            currentViewMachineId = id;
+            
+            // Hide machines list, show details section
+            document.getElementById('section-machines').classList.add('hidden');
+            document.getElementById('section-machine-detail').classList.remove('hidden');
+            document.getElementById('page-title').innerText = 'Machine Details';
+
+            // Populate Header Data
+            document.getElementById('det-machine-name').innerText = machine.name;
+            document.getElementById('det-machine-id').innerText = machine.id;
+            document.getElementById('det-machine-model').innerText = machine.model;
+            document.getElementById('det-machine-loc').innerText = machine.location;
+            
+            const badge = document.getElementById('det-machine-status');
+            badge.innerText = machine.status;
+            badge.className = `px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                machine.status === 'Active' ? 'bg-green-100 text-green-800 border-green-200' : 
+                (machine.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-gray-100 text-gray-800 border-gray-200')
+            }`;
+
+            // Default to logs tab
+            switchDetailTab('logs');
+            renderMachineLogs();
+            renderMachineDocs();
+        }
+
+        function switchDetailTab(tabId) {
+            const btnLogs = document.getElementById('tab-btn-logs');
+            const btnDocs = document.getElementById('tab-btn-docs');
+            const secLogs = document.getElementById('tab-logs');
+            const secDocs = document.getElementById('tab-docs');
+
+            const activeClass = "px-6 py-3 border-b-2 border-brand-600 text-brand-600 text-sm font-medium bg-gray-50 transition-colors";
+            const inactiveClass = "px-6 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors";
+
+            if (tabId === 'logs') {
+                btnLogs.className = activeClass;
+                btnDocs.className = inactiveClass;
+                secLogs.classList.remove('hidden');
+                secDocs.classList.add('hidden');
+            } else {
+                btnDocs.className = activeClass;
+                btnLogs.className = inactiveClass;
+                secDocs.classList.remove('hidden');
+                secLogs.classList.add('hidden');
+            }
+        }
+
+        function renderMachineLogs() {
+            const machine = appData.machines.find(m => m.id === currentViewMachineId);
+            const tbody = document.getElementById('logs-tbody');
+            tbody.innerHTML = '';
+            
+            if (!machine.logs || machine.logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-gray-500 text-sm">No maintenance history recorded.</td></tr>`;
+                return;
+            }
+
+            // Reverse to show newest first
+            [...machine.logs].reverse().forEach(log => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500">${log.date}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-900 font-medium">${log.techName}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500">${log.timeSpent} hrs</td>
+                    <td class="px-4 py-3 text-gray-600">${log.workDone}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderMachineDocs() {
+            const machine = appData.machines.find(m => m.id === currentViewMachineId);
+            const tbody = document.getElementById('docs-tbody');
+            tbody.innerHTML = '';
+            
+            if (!machine.docs || machine.docs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-gray-500 text-sm">No documents attached.</td></tr>`;
+                return;
+            }
+
+            [...machine.docs].reverse().forEach(doc => {
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-red-500 text-center"><i class="fa-solid fa-file-pdf text-lg"></i></td>
+                    <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900">${doc.name}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500">${doc.date}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-gray-500">${doc.size || 'N/A'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="showToast('Downloading ${doc.name}...', 'success')" class="text-brand-600 hover:text-brand-900 mr-2" title="Download Document">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- STREAMING_CHUNK:Implementing CRUD and Form Submission logic... ---
+        // --- Modals & CRUD ---
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            // reset forms if applicable
+            if(modalId === 'machine-modal') document.getElementById('machine-form').reset();
+            if(modalId === 'tech-modal') document.getElementById('tech-form').reset();
+            if(modalId === 'log-modal') document.getElementById('log-form').reset();
+            if(modalId === 'doc-modal') document.getElementById('doc-form').reset();
+        }
+
+        // Technician CRUD
+        function saveTechnician(e) {
+            e.preventDefault();
+            const id = document.getElementById('tech-id').value;
+            const name = document.getElementById('tech-name').value.trim();
+            const specialty = document.getElementById('tech-specialty').value.trim();
+            const phone = document.getElementById('tech-phone').value.trim();
+
+            if (id) {
+                // Edit
+                const index = appData.technicians.findIndex(t => t.id === id);
+                if(index > -1) {
+                    appData.technicians[index] = { id, name, specialty, phone };
+                    showToast('Technician updated');
+                }
+            } else {
+                // Add
+                const newId = 'TEC-' + Math.floor(Math.random() * 900 + 100);
+                appData.technicians.push({ id: newId, name, specialty, phone });
+                showToast('Technician added');
+            }
+
+            saveData();
+            renderTechsTable();
+            renderDashboard(); // update count
+            closeModal('tech-modal');
+        }
+
+        function editTechnician(id) {
+            const t = appData.technicians.find(t => t.id === id);
+            if(t) {
+                document.getElementById('tech-modal-title').innerText = 'Edit Technician';
+                document.getElementById('tech-id').value = t.id;
+                document.getElementById('tech-name').value = t.name;
+                document.getElementById('tech-specialty').value = t.specialty;
+                document.getElementById('tech-phone').value = t.phone;
+                openModal('tech-modal');
+            }
+        }
+
+        function deleteTechnician(id) {
+            if(confirm('Are you sure you want to delete this technician?')) {
+                appData.technicians = appData.technicians.filter(t => t.id !== id);
+                saveData();
+                renderTechsTable();
+                renderDashboard();
+                showToast('Technician deleted');
+            }
+        }
+
+        // Machine CRUD
+        function saveMachine(e) {
+            e.preventDefault();
+            const id = document.getElementById('mach-id').value;
+            const name = document.getElementById('mach-name').value.trim();
+            const model = document.getElementById('mach-model').value.trim();
+            const location = document.getElementById('mach-location').value.trim();
+            const status = document.getElementById('mach-status').value;
+
+            if (id) {
+                const index = appData.machines.findIndex(m => m.id === id);
+                if(index > -1) {
+                    appData.machines[index] = { ...appData.machines[index], name, model, location, status };
+                    showToast('Machine updated');
+                }
+            } else {
+                const newId = 'MAC-' + Math.floor(Math.random() * 900 + 100);
+                appData.machines.push({ id: newId, name, model, location, status, logs: [], docs: [] });
+                showToast('Machine added');
+            }
+
+            saveData();
+            renderMachinesTable();
+            renderDashboard();
+            closeModal('machine-modal');
+        }
+
+        function editMachine(id) {
+            const m = appData.machines.find(m => m.id === id);
+            if(m) {
+                document.getElementById('machine-modal-title').innerText = 'Edit Machine';
+                document.getElementById('mach-id').value = m.id;
+                document.getElementById('mach-name').value = m.name;
+                document.getElementById('mach-model').value = m.model;
+                document.getElementById('mach-location').value = m.location;
+                document.getElementById('mach-status').value = m.status;
+                openModal('machine-modal');
+            }
+        }
+
+        function deleteMachine(id) {
+            if(confirm('Are you sure you want to delete this machine? Associated data will be lost.')) {
+                appData.machines = appData.machines.filter(m => m.id !== id);
+                saveData();
+                renderMachinesTable();
+                renderDashboard();
+                showToast('Machine deleted');
+            }
+        }
+
+        // Sub-resources (Logs & Docs)
+        function openLogModal() {
+            const select = document.getElementById('log-tech-select');
+            select.innerHTML = '';
+            appData.technicians.forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t.name;
+                opt.innerText = t.name;
+                select.appendChild(opt);
+            });
+            if(appData.technicians.length === 0) {
+                let opt = document.createElement('option');
+                opt.value = "Unknown";
+                opt.innerText = "No technicians available";
+                select.appendChild(opt);
+            }
+            openModal('log-modal');
+        }
+
+        function saveLog(e) {
+            e.preventDefault();
+            const machine = appData.machines.find(m => m.id === currentViewMachineId);
+            if (!machine) return;
+
+            const techName = document.getElementById('log-tech-select').value;
+            const timeSpent = document.getElementById('log-time').value;
+            const workDone = document.getElementById('log-work').value.trim();
+            const date = new Date().toISOString().split('T')[0];
+
+            if(!machine.logs) machine.logs = [];
+            machine.logs.push({ id: Date.now(), date, techName, timeSpent, workDone });
+            
+            saveData();
+            renderMachineLogs();
+            closeModal('log-modal');
+            showToast('Log entry added');
+        }
+
+        function openDocModal() {
+            openModal('doc-modal');
+        }
+
+        function saveDoc(e) {
+            e.preventDefault();
+            const machine = appData.machines.find(m => m.id === currentViewMachineId);
+            if (!machine) return;
+
+            const fileInput = document.getElementById('doc-file');
+            if(fileInput.files.length === 0) return;
+            
+            const fileName = fileInput.files[0].name;
+            const date = new Date().toISOString().split('T')[0];
+            
+            // Generate a simulated file size string based on the actual file or mock it
+            const rawSize = fileInput.files[0].size;
+            let sizeStr = rawSize ? (rawSize / (1024 * 1024)).toFixed(1) + ' MB' : (Math.random() * 5 + 0.5).toFixed(1) + ' MB';
+            if (rawSize && rawSize < 1048576) {
+                sizeStr = (rawSize / 1024).toFixed(0) + ' KB';
+            }
+
+            if(!machine.docs) machine.docs = [];
+            machine.docs.push({ id: Date.now(), name: fileName, date, size: sizeStr });
+            
+            saveData();
+            renderMachineDocs();
+            closeModal('doc-modal');
+            showToast('Document uploaded successfully');
+        }
+
+        // --- STREAMING_CHUNK:Finalizing Utilities (Toasts)... ---
+        // --- Utilities ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'success' ? 'bg-gray-800' : 'bg-red-600';
+            const icon = type === 'success' ? 'fa-check-circle text-green-400' : 'fa-exclamation-circle text-white';
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded shadow-lg flex items-center gap-3 text-sm font-medium toast-enter pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Boot
+        window.onload = initApp;
+
+    </script>
+</body>
+</html>
