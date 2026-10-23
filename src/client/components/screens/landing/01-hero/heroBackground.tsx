@@ -1,6 +1,6 @@
 export function HeroBackground() {
     return (
-        <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
 
             {/* Background Video */}
             <video
@@ -8,7 +8,7 @@ export function HeroBackground() {
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload="auto"
                 poster="/images/hero-poster.webp"
                 className="
                     absolute

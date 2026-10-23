@@ -16,6 +16,8 @@
     "db:seed:sample": "tsx scripts/db-seed-sample.ts"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
+    "@tanstack/react-query": "^5.104.5",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^14.6.0",
     "hls.js": "^1.7.3",
@@ -24,6 +26,7 @@
     "next": "^15.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-redux": "^9.3.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
