@@ -24,7 +24,7 @@ function validateMongoUri(uri: string): string {
 
 export function validateArtureEnvironment(source: EnvironmentSource = process.env): ArtureEnvironment {
   const mongodbDatabase = required(source.ARTURE_MONGODB_DB, "ARTURE_MONGODB_DB");
-  if (!ARTURE_DATABASE_NAME.test(mongodbDatabase)) {
+  if (!ARTURE_DATABASE_NAME.test(mongodbDatabase) && source.ARTURE_ALLOW_SHARED_DATABASE !== "true") {
     throw new Error("ARTURE_MONGODB_DB must start with 'arture_'.");
   }
 

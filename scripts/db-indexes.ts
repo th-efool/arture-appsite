@@ -1,9 +1,16 @@
+import { ensureConversationIndexes } from "../src/lib/conversation-recorder";
+import { ensureKnowledgeIndexes, knowledgeOptions } from "../src/lib/knowledge";
 import { closeArtureDb, getArtureDb } from "../src/lib/db";
 import { artureCollectionNames } from "../src/lib/repositories";
 
 async function main() {
   const db = await getArtureDb();
+  await ensureConversationIndexes(db);
+  const knowledge = knowledgeOptions();
+  await ensureKnowledgeIndexes(db, knowledge.mode === "vector" && knowledge.vectorBackend !== "local");
   await Promise.all([
+    db.collection("arture_app_connections").createIndex({ connectionId: 1 }, { unique: true, sparse: true }),
+    db.collection("arture_app_connections").createIndex({ assetCode: 1, lastSeenAt: -1 }),
     db.collection(artureCollectionNames.users).createIndex({ email: 1 }, { unique: true }),
     db.collection(artureCollectionNames.sessions).createIndex({ tokenHash: 1 }, { unique: true }),
     db.collection(artureCollectionNames.sessions).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),

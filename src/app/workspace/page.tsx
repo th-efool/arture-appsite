@@ -2,13 +2,17 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import DocumentKnowledge from "@/client/components/document-knowledge";
+import ConversationSessions from "@/client/components/conversation-sessions";
+import Dashboard from "@/client/components/workspace-dashboard";
+import { AppConnectionsProvider, AppConnectionStatus } from "@/client/components/app-connection-status";
+import { isPumpDemo, isGuest } from "@/lib/demo-machine";
 import { useRouter } from "next/navigation";
 
 type Status = "operational" | "service_due" | "offline";
 type Machine = { id: string; assetCode: string; name: string; model: string; location: string; status: Status };
 type Tech = { id: string; name: string; specialty: string; phone: string; active: boolean };
-type User = { id: string; name: string; role: "admin" | "technician" };
-type DocumentRecord = { id: string; originalName: string; mimeType: string; size: number };
+type User = { email?: string; id: string; name: string; role: "admin" | "technician" };
 type ServiceLog = { id: string; technicianName: string; serviceDate: string; minutesSpent: number; notes: string };
 
 const statusText = (status: Status) => {
@@ -84,12 +88,9 @@ export default function Home() {
       setMachines(machineResult.machines);
       setTechs(technicianResult.technicians);
     } catch (cause) {
-      if (!user) {
-        router.replace("/login");
-      }
       setError(cause instanceof Error ? cause.message : "Could not load Arture.");
     }
-  }, [router, user]);
+  }, [router]);
 
   useEffect(() => {
     void load();
@@ -185,6 +186,7 @@ export default function Home() {
   }
 
   return (
+    <AppConnectionsProvider>
     <main className="shell">
       {/* Sleek, Modern, Centered Button-Based Side Navigation Panel */}
       <NavigationRail
@@ -200,9 +202,9 @@ export default function Home() {
           <div className="topbar-left">
             <span className="topbar-badge">
               <span className="topbar-badge-dot" />
-              Plant Floor AR Mesh
+              Machine Workspace
             </span>
-            <p className="topbar-title">Arture Spatial OS &middot; Digital Twin &amp; Knowledge Hub</p>
+            <p className="topbar-title">Arture &middot; Machine Documents &amp; Work History</p>
           </div>
           <div className="topbar-right">
             <div className="topbar-user">
@@ -247,7 +249,8 @@ export default function Home() {
             setViewMode={setViewMode}
             open={openDetail}
             add={() => setModal("machine")}
-            admin={user.role === "admin"}
+            admin={user.role === "admin" && !isPumpDemo(user)}
+            readOnly={isGuest(user)}
             onQuickLog={(m) => {
               setSelected(m.id);
               setModal("log");
@@ -268,6 +271,7 @@ export default function Home() {
             machine={machine}
             techs={techs}
             refreshKey={serviceVersion}
+            readOnly={isGuest(user)}
             back={() => setView("machines")}
             log={() => setModal("log")}
           />
@@ -290,6 +294,7 @@ export default function Home() {
         />
       )}
     </main>
+    </AppConnectionsProvider>
   );
 }
 
@@ -363,10 +368,7 @@ function NavigationRail({
 
       {/* Bottom Controls */}
       <div className="rail-foot">
-        <div className="mesh-status-indicator" title="Spatial Mesh Stream: 60 FPS Online">
-          <div className="mesh-status-dot" />
-          <span className="tooltip">AR Mesh Stream: Live</span>
-        </div>
+        <div className="mesh-status-indicator" title="Voice relay connection"><span className="tooltip"><AppConnectionStatus /></span></div>
 
         <button
           className="rail-foot-btn"
@@ -386,266 +388,6 @@ function NavigationRail({
    DASHBOARD / MISSION CONTROL (COMPLETELY REDESIGNED)
    Answers clearly: What is Arture? What can I do right now?
    ======================================================= */
-function Dashboard({
-  machines,
-  techs,
-  open,
-  all,
-  viewTechs
-}: {
-  machines: Machine[];
-  techs: Tech[];
-  open: (id: string) => void;
-  all: () => void;
-  viewTechs: () => void;
-}) {
-  const operationalCount = machines.filter((m) => m.status === "operational").length;
-  const serviceDueCount = machines.filter((m) => m.status === "service_due").length;
-  const offlineCount = machines.filter((m) => m.status === "offline").length;
-  const attentionList = machines.filter((m) => m.status !== "operational");
-  const healthPercent = machines.length > 0 ? Math.round((operationalCount / machines.length) * 100) : 100;
-
-  return (
-    <div className="page dashboard-grid">
-      {/* 1. Hero Mission Control Banner: Clear explanation of WHAT Arture is */}
-      <div className="mission-banner">
-        <div className="mission-banner-content">
-          <div className="mission-tag-row">
-            <span className="mission-tag">
-              <span className="mission-tag-dot" />
-              Plant Floor Mesh Active
-            </span>
-            <span className="mission-tag">3 Connected Digital Twins</span>
-            <span className="mission-tag">🎙️ ConvoAI Voice Stream (24kHz Ready)</span>
-          </div>
-
-          <div>
-            <p className="eyebrow" style={{ color: "#fb923c" }}>ARTURE // AI SPATIAL OPERATING SYSTEM</p>
-            <h2>Industrial expertise, directly overlaid on the physical world.</h2>
-            <p className="mission-desc">
-              Arture connects heavy machinery with spatial AR computing. Turn technical manuals into step-by-step
-              holographic guides for field technicians, converse with hands-free AI voice assistants on live equipment,
-              and monitor plant-wide digital twins in real time.
-            </p>
-          </div>
-
-          <div className="mission-quick-actions">
-            <button className="btn-primary btn-orange" onClick={all}>
-              <GlassesIcon />
-              <span>Explore Systems &amp; Launch AR Guides</span>
-            </button>
-            <button className="btn-secondary" style={{ background: "rgba(255,255,255,0.12)", color: "#ffffff", borderColor: "rgba(255,255,255,0.2)" }} onClick={viewTechs}>
-              <UsersIcon />
-              <span>Connect Remote Expert</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Core Spatial Workflows: "What You Can Do" */}
-      <section>
-        <div className="workflow-section-title">
-          <h3>Core Spatial Operations</h3>
-          <p>Choose an operational workflow to deploy on the plant floor.</p>
-        </div>
-
-        <div className="workflow-cards-grid">
-          {/* Card 1 */}
-          <div className="workflow-card" onClick={all} style={{ cursor: "pointer" }}>
-            <div className="workflow-card-top">
-              <div className="workflow-icon-wrap orange">
-                <GlassesIcon />
-              </div>
-              <div>
-                <h4>Guided AR Procedures</h4>
-                <p>
-                  Deploy interactive 3D spatial pins and checklist steps directly onto physical equipment for technicians wearing AR glasses or using mobile devices.
-                </p>
-              </div>
-            </div>
-            <span className="workflow-card-action">
-              <span>View Systems &amp; Procedures</span> &rarr;
-            </span>
-          </div>
-
-          {/* Card 2 */}
-          <div className="workflow-card" onClick={all} style={{ cursor: "pointer" }}>
-            <div className="workflow-card-top">
-              <div className="workflow-icon-wrap cyan">
-                <DocumentIcon />
-              </div>
-              <div>
-                <h4>AI Knowledge &amp; SOP Ingestion</h4>
-                <p>
-                  Upload dense PDF manuals and schematics. Our AI automatically parses assemblies and indexes voice-interactive troubleshooting steps.
-                </p>
-              </div>
-            </div>
-            <span className="workflow-card-action">
-              <span>Inspect Machine Manuals</span> &rarr;
-            </span>
-          </div>
-
-          {/* Card 3 */}
-          <div className="workflow-card" onClick={viewTechs} style={{ cursor: "pointer" }}>
-            <div className="workflow-card-top">
-              <div className="workflow-icon-wrap mint">
-                <UsersIcon />
-              </div>
-              <div>
-                <h4>Live Expert Telepresence</h4>
-                <p>
-                  Connect on-site operators with senior engineers via spatial audio and live AR telestration to resolve urgent bottlenecks with zero travel time.
-                </p>
-              </div>
-            </div>
-            <span className="workflow-card-action">
-              <span>Open Expert Directory</span> &rarr;
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Telemetry & Metrics Row */}
-      <section className="metrics-row">
-        <div className="metric-card">
-          <span className="metric-card-label">Fleet Health Index</span>
-          <div className="metric-card-val-row">
-            <span className="metric-card-val" style={{ color: healthPercent > 70 ? "var(--mint)" : "var(--amber)" }}>
-              {healthPercent}%
-            </span>
-            <span className="metric-card-sub">{operationalCount} of {machines.length} nominal</span>
-          </div>
-          <div className="metric-bar-wrap">
-            <div className="metric-bar-fill" style={{ width: `${healthPercent}%` }} />
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <span className="metric-card-label">Connected Digital Twins</span>
-          <div className="metric-card-val-row">
-            <span className="metric-card-val">{String(machines.length).padStart(2, "0")}</span>
-            <span className="metric-card-sub">Active 3D Models</span>
-          </div>
-          <div className="metric-bar-wrap">
-            <div className="metric-bar-fill" style={{ width: "100%", background: "linear-gradient(90deg, #f97316 0%, #fb923c 100%)" }} />
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <span className="metric-card-label">Maintenance Due</span>
-          <div className="metric-card-val-row">
-            <span className="metric-card-val" style={{ color: serviceDueCount > 0 ? "var(--amber)" : "var(--ink)" }}>
-              {String(serviceDueCount).padStart(2, "0")}
-            </span>
-            <span className="metric-card-sub">Action Required</span>
-          </div>
-          <div className="metric-bar-wrap">
-            <div className="metric-bar-fill" style={{ width: `${(serviceDueCount / Math.max(machines.length, 1)) * 100}%`, background: "#f59e0b" }} />
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <span className="metric-card-label">Certified Experts</span>
-          <div className="metric-card-val-row">
-            <span className="metric-card-val">{String(techs.filter((t) => t.active).length).padStart(2, "0")}</span>
-            <span className="metric-card-sub">On-Call Now</span>
-          </div>
-          <div className="metric-bar-wrap">
-            <div className="metric-bar-fill" style={{ width: "100%", background: "#0284c7" }} />
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Operations Command: Priority Systems Needing Attention + Recent Live Activity */}
-      <section className="ops-two-col">
-        {/* Systems Requiring Action */}
-        <div className="ops-panel">
-          <div className="ops-panel-head">
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <h3>Priority Attention Systems</h3>
-              {attentionList.length > 0 && (
-                <span className="ops-panel-badge">{attentionList.length} Action Needed</span>
-              )}
-            </div>
-            <button className="btn-secondary" style={{ padding: "6px 12px", fontSize: 12 }} onClick={all}>
-              View All Systems
-            </button>
-          </div>
-
-          <div className="ops-panel-body">
-            {attentionList.length > 0 ? (
-              attentionList.map((m) => (
-                <div key={m.id} className="attention-card-item">
-                  <div className="attention-item-left">
-                    <StatusPill status={m.status} />
-                    <div className="attention-item-info">
-                      <h5>{m.name}</h5>
-                      <p>{m.assetCode} &middot; {m.location} &middot; {m.model}</p>
-                    </div>
-                  </div>
-                  <button className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }} onClick={() => open(m.id)}>
-                    Launch AR Twin &rarr;
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: "32px 16px", textAlign: "center", color: "#64748b", fontSize: 14 }}>
-                &check; All connected systems are currently operational and nominal.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Live Plant Floor Activity Stream */}
-        <div className="ops-panel">
-          <div className="ops-panel-head">
-            <h3>Recent Spatial Activity</h3>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>LIVE TELEMETRY</span>
-          </div>
-
-          <div className="ops-panel-body">
-            <div className="activity-list">
-              <div className="activity-item">
-                <div className="activity-item-dot" style={{ background: "var(--mint)" }} />
-                <div className="activity-item-content">
-                  <p><b>Rohan Iyer</b> completed mirror alignment on <b>Laser Cutter</b> via AR overlay.</p>
-                  <small>45 min &middot; ATR-DEMO-002</small>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-item-dot" style={{ background: "var(--orange)" }} />
-                <div className="activity-item-content">
-                  <p><b>Asha Mehta</b> calibrated spindle speed and bearing vibration on <b>CNC Router</b>.</p>
-                  <small>30 min &middot; ATR-DEMO-001</small>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-item-dot" style={{ background: "var(--red)" }} />
-                <div className="activity-item-content">
-                  <p><b>Nisha Rao</b> flagged thermal fault on <b>Vacuum Former</b>; replacement heating coil pending.</p>
-                  <small>60 min &middot; ATR-DEMO-003</small>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-item-dot" style={{ background: "var(--cyan)" }} />
-                <div className="activity-item-content">
-                  <p><b>AI Convo Assistant</b> indexed 14 spatial anchor points for Luma 60W manual.</p>
-                  <small>Automated knowledge ingest</small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-/* =======================================================
-   SYSTEMS VIEW (REDESIGNED TO LOOK WORLD-CLASS)
-   Grid cards + Table view, instant KPI filters, search
-   ======================================================= */
 function MachinesView({
   machines,
   filtered,
@@ -658,6 +400,7 @@ function MachinesView({
   open,
   add,
   admin,
+  readOnly,
   onQuickLog
 }: {
   machines: Machine[];
@@ -671,6 +414,7 @@ function MachinesView({
   open: (id: string) => void;
   add: () => void;
   admin: boolean;
+  readOnly: boolean;
   onQuickLog: (m: Machine) => void;
 }) {
   const operationalCount = machines.filter((m) => m.status === "operational").length;
@@ -682,11 +426,10 @@ function MachinesView({
       {/* Header */}
       <div className="page-head">
         <div>
-          <p className="eyebrow">FLEET TELEMETRY &amp; DIGITAL TWINS</p>
-          <h1>Connected Industrial Systems</h1>
+          <p className="eyebrow">MACHINE RECORDS</p>
+          <h1>Machines</h1>
           <p className="lede">
-            Live digital twin representations of on-floor machinery. Each asset contains 3D CAD references,
-            AI-extracted procedures, maintenance history, and spatial anchors.
+            Browse registered equipment, uploaded manuals, and recorded work history. App connection status is reported by the voice relay.
           </p>
         </div>
         {admin && (
@@ -817,8 +560,8 @@ function MachinesView({
 
                 <dl className="system-specs-grid">
                   <div className="system-spec-item">
-                    <dt>Spatial Mesh</dt>
-                    <dd style={{ color: "var(--mint)" }}>&check; Ready in AR</dd>
+                    <dt>App Connection</dt>
+                    <dd><AppConnectionStatus assetCode={item.assetCode} /></dd>
                   </div>
                   <div className="system-spec-item">
                     <dt>Assigned Bay</dt>
@@ -832,13 +575,14 @@ function MachinesView({
                     style={{ flex: 1, justifyContent: "center" }}
                     onClick={() => open(item.id)}
                   >
-                    <span>Inspect AR Twin &amp; SOPs</span>
+                    <span>Open Machine &amp; Documents</span>
                     <span>&rarr;</span>
                   </button>
                   <button
                     className="btn-secondary"
                     onClick={() => onQuickLog(item)}
                     title="Log work or service event"
+                    disabled={readOnly}
                   >
                     Log
                   </button>
@@ -859,7 +603,7 @@ function MachinesView({
                 <th>Asset Code</th>
                 <th>Location</th>
                 <th>Status</th>
-                <th>Spatial Twin</th>
+                <th>App Connection</th>
                 <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
@@ -887,8 +631,8 @@ function MachinesView({
                     <StatusPill status={item.status} />
                   </td>
                   <td>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--mint)" }}>
-                      &check; 3D Anchored
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                      <AppConnectionStatus assetCode={item.assetCode} />
                     </span>
                   </td>
                   <td style={{ textAlign: "right" }}>
@@ -946,11 +690,10 @@ function TechsView({
     <div className="page">
       <div className="page-head">
         <div>
-          <p className="eyebrow">ON-CALL SPECIALISTS</p>
-          <h1>Expert Guidance Network</h1>
+          <p className="eyebrow">REGISTERED WORKERS</p>
+          <h1>Workers</h1>
           <p className="lede">
-            Specialized senior engineers and technicians available for real-time remote spatial assistance,
-            live AR video annotations, and procedural validation.
+            Registered workers and their contact details. Active status reflects the worker record; live availability is not tracked.
           </p>
         </div>
         {admin && (
@@ -969,7 +712,7 @@ function TechsView({
                 {tech.name.split(" ").map((n) => n[0]).join("")}
               </div>
               <span className={`expert-status-badge ${tech.active ? "active" : "offline"}`}>
-                ● {tech.active ? "Available" : "Offline"}
+                ● {tech.active ? "Active" : "Inactive"}
               </span>
             </div>
 
@@ -996,12 +739,14 @@ function DetailView({
   machine,
   techs,
   refreshKey,
+  readOnly,
   back,
   log
 }: {
   machine: Machine;
   techs: Tech[];
   refreshKey: number;
+  readOnly: boolean;
   back: () => void;
   log: () => void;
 }) {
@@ -1033,7 +778,7 @@ function DetailView({
           <p className="eyebrow">{machine.assetCode} &middot; {machine.location}</p>
           <h1 style={{ margin: "4px 0 8px 0", fontSize: 32, fontWeight: 800 }}>{machine.name}</h1>
           <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>
-            Model: <b>{machine.model}</b> &middot; Digital Twin mesh loaded &amp; ready for AR overlay.
+            Model: <b>{machine.model}</b> &middot; <AppConnectionStatus assetCode={machine.assetCode} />
           </p>
         </div>
         <StatusPill status={machine.status} />
@@ -1043,7 +788,7 @@ function DetailView({
         {/* System Overview Panel */}
         <section className="detail-panel">
           <p className="eyebrow">SPATIAL WORKFLOW CONTEXT</p>
-          <h3 style={{ margin: "6px 0 16px 0", fontSize: 20, fontWeight: 800 }}>Status &amp; Assigned Expert</h3>
+          <h3 style={{ margin: "6px 0 16px 0", fontSize: 20, fontWeight: 800 }}>Machine Status</h3>
 
           <div style={{ padding: "16px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0", marginBottom: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
@@ -1051,9 +796,9 @@ function DetailView({
               <StatusPill status={machine.status} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Lead Technician</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Assigned Worker</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
-                {techs.find((t) => t.active)?.name || "Unassigned"}
+                Unassigned
               </span>
             </div>
           </div>
@@ -1062,15 +807,18 @@ function DetailView({
             className="btn-primary btn-orange"
             style={{ width: "100%", justifyContent: "center" }}
             onClick={log}
-            disabled={!techs.some((t) => t.active)}
+            disabled={readOnly || !techs.some((t) => t.active)}
           >
             + Document Service / Work Event
           </button>
+          {readOnly && <p style={{ color: "#64748b", fontSize: 12 }}>Guest access is read-only. Sign in as an administrator to make changes.</p>}
         </section>
 
         {/* Knowledge Sources & Documents */}
-        <Documents machineId={machine.id} />
+        <DocumentKnowledge key={machine.id} machineId={machine.id} />
       </div>
+
+      <ConversationSessions key={machine.id} machineId={machine.id} />
 
       {/* Service & Evidence Timeline */}
       <section className="detail-panel">
@@ -1110,128 +858,6 @@ function DetailView({
 /* =======================================================
    DOCUMENTS & SOP INGESTION
    ======================================================= */
-function Documents({ machineId }: { machineId: string }) {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [admin, setAdmin] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setDocuments((await api<{ documents: DocumentRecord[] }>(`/api/documents?machineId=${machineId}`)).documents);
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Could not load knowledge sources.");
-    }
-  }, [machineId]);
-
-  useEffect(() => {
-    void load();
-    void api<{ user: User | null }>("/api/auth/session")
-      .then(({ user }) => setAdmin(user?.role === "admin"))
-      .catch(() => setAdmin(false));
-  }, [load]);
-
-  const upload = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const file = new FormData(event.currentTarget).get("file");
-    if (!(file instanceof File) || !file.size) {
-      setMessage("Please choose a valid PDF, PNG, or JPEG file.");
-      return;
-    }
-    setBusy(true);
-    setMessage("");
-    try {
-      const form = new FormData();
-      form.set("machineId", machineId);
-      form.set("file", file);
-      const response = await fetch("/api/documents", { method: "POST", body: form });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Upload failed.");
-      event.currentTarget.reset();
-      await load();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Upload failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("Delete this knowledge source?")) return;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/documents/${id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || "Delete failed.");
-      }
-      setDocuments((current) => current.filter((doc) => doc.id !== id));
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Delete failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section className="detail-panel">
-      <p className="eyebrow">AI KNOWLEDGE SOURCES</p>
-      <h3 style={{ margin: "6px 0 16px 0", fontSize: 20, fontWeight: 800 }}>Manuals, SOPs &amp; Diagrams</h3>
-
-      {admin && (
-        <form onSubmit={upload} style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>
-            Upload Technical Manual (PDF / PNG / JPEG)
-            <input
-              name="file"
-              type="file"
-              accept="application/pdf,image/png,image/jpeg"
-              required
-              style={{ marginTop: 6, padding: "8px", border: "1px solid #cbd5e1", borderRadius: 8, width: "100%", background: "#ffffff" }}
-            />
-          </label>
-          <button className="btn-secondary" disabled={busy} style={{ alignSelf: "flex-start" }}>
-            {busy ? "Processing & Ingesting..." : "+ Ingest Knowledge Document"}
-          </button>
-        </form>
-      )}
-
-      {message && <p style={{ color: "#ef4444", fontSize: 12 }}>{message}</p>}
-
-      {documents.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {documents.map((doc) => (
-            <div key={doc.id} className="doc-row-item">
-              <div className="doc-row-left">
-                <span className="doc-badge">
-                  {doc.mimeType === "application/pdf" ? "PDF" : "IMG"}
-                </span>
-                <a className="doc-link" href={`/api/documents/${doc.id}/download`}>
-                  {doc.originalName} ({Math.ceil(doc.size / 1024)} KB)
-                </a>
-              </div>
-              {admin && (
-                <button
-                  onClick={() => void remove(doc.id)}
-                  disabled={busy}
-                  style={{ color: "#94a3b8", fontSize: 18, padding: 4 }}
-                  title="Delete Document"
-                >
-                  &times;
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p style={{ color: "#64748b", fontSize: 13 }}>
-          No manuals or SOP documents attached. Upload a PDF or schematic to enable AI spatial step extraction.
-        </p>
-      )}
-    </section>
-  );
-}
-
 /* =======================================================
    MODALS / DIALOGS
    ======================================================= */
@@ -1337,7 +963,7 @@ function LogForm({
           <input name="serviceDate" type="date" defaultValue={new Date().toISOString().split("T")[0]} required />
         </label>
         <label>
-          Minutes Spent in AR Guidance
+          Minutes Spent
           <input name="minutesSpent" type="number" min="1" max="1440" defaultValue="45" required />
         </label>
         <label>

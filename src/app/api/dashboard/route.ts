@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { activity, machines, maintenanceLogs } from "@/lib/repositories";
-import { apiError, jsonId, requireUser } from "@/lib/api";
+import { apiError, requireUser } from "@/lib/api";
+import { getArtureDb } from "@/lib/db";
+import { getWorkspaceDashboard } from "@/lib/workspace-dashboard";
 export const runtime = "nodejs";
-export async function GET() { try { await requireUser(); const all = await machines.list(); const logs = await maintenanceLogs.list(); return NextResponse.json({ metrics: { registered: all.length, operational: all.filter(x => x.status === "operational").length, attention: all.filter(x => x.status !== "operational").length }, attention: all.filter(x => x.status !== "operational").map(jsonId), activity: (await activity.list()).map(jsonId), recentMaintenance: logs.slice(0, 8).map(jsonId) }); } catch (e) { return apiError(e); } }
+export const dynamic = "force-dynamic";
+export async function GET() {
+  try {
+    const user = await requireUser();
+    return NextResponse.json(await getWorkspaceDashboard(await getArtureDb(), user), { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return apiError(error); }
+}

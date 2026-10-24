@@ -2,14 +2,15 @@ import { Collection, ObjectId } from "mongodb";
 import { getArtureDb } from "@/lib/db";
 import { machineSchema, maintenanceSchema, technicianSchema } from "@/lib/schemas";
 import { phoneIdentity } from "@/lib/phone";
+import type { KnowledgeState } from "./knowledge";
 
 export type ArtureRole = "admin" | "technician";
 export type ArtureUser = { _id?: ObjectId; email: string; name: string; passwordHash: string; role: ArtureRole; createdAt: Date; updatedAt: Date };
 export type ArtureSession = { _id?: ObjectId; tokenHash: string; userId: ObjectId; expiresAt: Date; createdAt: Date };
 export type ArtureMachine = { _id?: ObjectId; assetCode: string; name: string; model: string; location: string; status: "operational" | "service_due" | "offline"; archivedAt: Date | null; createdAt: Date; updatedAt: Date; seedKey?: string };
 export type ArtureTechnician = { _id?: ObjectId; name: string; specialty: string; phone: string; active: boolean; createdAt: Date; updatedAt: Date; seedKey?: string };
-export type ArtureMaintenanceLog = { _id?: ObjectId; machineId: ObjectId; technicianId: ObjectId; technicianName: string; serviceDate: Date; minutesSpent: number; notes: string; createdAt: Date; seedKey?: string };
-export type ArtureDocumentRecord = { _id?: ObjectId; machineId: ObjectId; gridFsFileId: ObjectId; originalName: string; mimeType: string; size: number; uploadedBy: ObjectId; createdAt: Date };
+export type ArtureMaintenanceLog = { _id?: ObjectId; machineId: ObjectId; technicianId: ObjectId; technicianName: string; serviceDate: Date; minutesSpent: number; notes: string; createdAt: Date; seedKey?: string; archivedAt?: Date | null };
+export type ArtureDocumentRecord = { _id?: ObjectId; machineId: ObjectId; gridFsFileId: ObjectId; originalName: string; mimeType: string; size: number; uploadedBy: ObjectId; createdAt: Date; knowledge?: KnowledgeState };
 export type ArtureActivity = { _id?: ObjectId; actorId: ObjectId | null; action: string; entityType: string; entityId: ObjectId | null; createdAt: Date };
 
 type CollectionMap = { users: ArtureUser; sessions: ArtureSession; machines: ArtureMachine; technicians: ArtureTechnician; logs: ArtureMaintenanceLog; documents: ArtureDocumentRecord; activity: ArtureActivity };
@@ -31,7 +32,7 @@ export const sessions = {
   async remove(tokenHash: string) { return (await collection("sessions")).deleteOne({ tokenHash }); },
 };
 export const machines = {
-  async list() { return (await collection("machines")).find({ archivedAt: null }).sort({ createdAt: -1 }).limit(100).toArray(); },
+  async list(filter: { assetCode?: string } = {}) { return (await collection("machines")).find({ ...filter, archivedAt: null }).sort({ createdAt: -1 }).limit(100).toArray(); },
   async byId(id: string) { return (await collection("machines")).findOne({ _id: new ObjectId(id), archivedAt: null }); },
   async byAssetCode(assetCode: string) { return (await collection("machines")).findOne({ assetCode: { $regex: `^${assetCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, archivedAt: null }); },
   async create(input: unknown) { const data = machineSchema.parse(input); const now = new Date(); return (await collection("machines")).insertOne({ ...data, archivedAt: null, createdAt: now, updatedAt: now }); },
@@ -46,7 +47,7 @@ export const technicians = {
   async update(id: string, input: unknown) { const data = technicianSchema.parse(input); return (await collection("technicians")).findOneAndUpdate({ _id: new ObjectId(id) }, { $set: { ...data, updatedAt: new Date() } }, { returnDocument: "after" }); },
 };
 export const maintenanceLogs = {
-  async list(machineId?: string) { return (await collection("logs")).find(machineId ? { machineId: new ObjectId(machineId) } : {}).sort({ serviceDate: -1 }).limit(100).toArray(); },
+  async list(machineId?: string) { return (await collection("logs")).find({ archivedAt: null, ...(machineId ? { machineId: new ObjectId(machineId) } : {}) }).sort({ serviceDate: -1 }).limit(100).toArray(); },
   async create(input: unknown, technicianName: string) { const data = maintenanceSchema.parse(input); return (await collection("logs")).insertOne({ ...data, machineId: new ObjectId(data.machineId), technicianId: new ObjectId(data.technicianId), technicianName, createdAt: new Date() }); },
 };
 export const documents = { async list(machineId?: string) { return (await collection("documents")).find(machineId ? { machineId: new ObjectId(machineId) } : {}).sort({ createdAt: -1 }).limit(100).toArray(); }, async byId(id: string) { return (await collection("documents")).findOne({ _id: new ObjectId(id) }); }, async create(record: Omit<ArtureDocumentRecord, "_id" | "createdAt">) { return (await collection("documents")).insertOne({ ...record, createdAt: new Date() }); }, async remove(id: string) { return (await collection("documents")).deleteOne({ _id: new ObjectId(id) }); } };

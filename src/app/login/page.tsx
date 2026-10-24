@@ -10,10 +10,16 @@ export default function LoginPage() {
   const [tab, setTab] = useState<"login" | "signup">("login");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("admin@arture.demo");
+  const [password, setPassword] = useState("");
+  const [demoFilled, setDemoFilled] = useState(false);
 
   useEffect(() => {
     // Preload workspace route chunk in background
     router.prefetch("/workspace");
+    fetch("/api/auth/demo", { cache: "no-store" }).then(res => res.json()).then(data => {
+      if (data.enabled) { setEmail(data.email); setPassword(data.password); setDemoFilled(true); }
+    }).catch(() => {});
 
     // Check if session already exists
     fetch("/api/auth/session")
@@ -56,6 +62,17 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+  const loginAsGuest = async () => {
+    setLoading(true); setMessage("");
+    try {
+      const response = await fetch("/api/auth/guest", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Guest login failed.");
+      try { sessionStorage.setItem("arture_user", JSON.stringify(data.user)); } catch {}
+      router.push("/workspace");
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Guest login failed."); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -125,7 +142,8 @@ export default function LoginPage() {
                   name="email"
                   type="email"
                   autoComplete="email"
-                  defaultValue="admin@arture.demo"
+                  value={email}
+                  onChange={event => setEmail(event.target.value)}
                   required
                 />
               </label>
@@ -136,8 +154,9 @@ export default function LoginPage() {
                   name="password"
                   type="password"
                   autoComplete="current-password"
-                  defaultValue="Arture-Demo-2026!"
-                  minLength={8}
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  minLength={12}
                   required
                 />
               </label>
@@ -155,11 +174,12 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
+            <button type="button" className="btn-secondary" disabled={loading} onClick={() => void loginAsGuest()} style={{ width: "100%", marginTop: 12 }}>Log in as guest</button>
 
             <aside className="demo-access">
               <p>Hackathon demo workspace</p>
               <code>admin@arture.demo</code>
-              <code>Arture-Demo-2026!</code>
+              <p>{demoFilled ? "Demo email and password are filled in. Open the workspace or explore as a read-only guest." : "Use your configured workspace password, or explore as a read-only guest when enabled."}</p>
             </aside>
           </section>
         </div>

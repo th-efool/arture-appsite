@@ -1,3 +1,4 @@
+import { migrateWaterPump } from "../src/lib/migrate-water-pump";
 import { ObjectId } from "mongodb";
 import { closeArtureDb, getArtureDb } from "../src/lib/db";
 import { validateArtureEnvironment } from "../src/lib/env";
@@ -19,11 +20,12 @@ async function main() {
   const technicianCollection = db.collection(artureCollectionNames.technicians);
   const logCollection = db.collection(artureCollectionNames.logs);
   const now = new Date();
+  await migrateWaterPump(db);
 
   for (const machine of artureDemoMachines) {
     await machineCollection.updateOne(
       { assetCode: machine.assetCode },
-      { $setOnInsert: { ...machine, seedKey: `arture-demo-machine-${machine.assetCode}-v1`, archivedAt: null, createdAt: now, updatedAt: now } },
+      { $setOnInsert: { ...machine, seedKey: "arture-demo-water-pump-v1", archivedAt: null, createdAt: now, updatedAt: now } },
       { upsert: true },
     );
   }
