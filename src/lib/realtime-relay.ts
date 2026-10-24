@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import type { Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import WebSocket, { WebSocketServer } from "ws";
 import { waterPump } from "./demo-machine";
 import { ConversationRecorder, ensureConversationIndexes } from "./conversation-recorder";
@@ -66,9 +66,29 @@ export async function startRealtimeRelay(options: RelayOptions) {
     if (stopping || sessions.size + upgrades >= (options.maxConnections ?? 8)) { reject(503, "Relay Busy"); return; }
     upgrades++;
     const deadline = setTimeout(() => socket.destroy(), 10000);
-    void options.db.collection("arture_machines").findOne({ assetCode: waterPump.assetCode, archivedAt: null }).then(machine => {
+    const resolveTargetMachine = async () => {
+      try {
+        let machine = await options.db.collection("arture_machines").findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+        if (!machine) {
+          const now = new Date();
+          await options.db.collection("arture_machines").updateOne(
+            { assetCode: waterPump.assetCode },
+            { $setOnInsert: { ...waterPump, seedKey: "arture-demo-water-pump-v1", archivedAt: null, createdAt: now, updatedAt: now } },
+            { upsert: true }
+          );
+          machine = await options.db.collection("arture_machines").findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+        }
+        return machine;
+      } catch (err: unknown) {
+        console.warn("MongoDB machine lookup failed, falling back to demo pump twin:", (err as Error)?.message ?? err);
+        return { _id: new ObjectId(), ...waterPump };
+      }
+    };
+
+    void resolveTargetMachine().then(machine => {
+      clearTimeout(deadline);
       if (socket.destroyed || stopping) return;
-      if (!machine) { reject(404, "Machine Not Found"); return; }
+      const targetMachine = machine || { _id: new ObjectId(), ...waterPump };
       wss.handleUpgrade(request, socket, head, client => {
         const id = randomUUID();
         let state: ConnectionState = "connecting";
@@ -84,7 +104,7 @@ export async function startRealtimeRelay(options: RelayOptions) {
         let knowledge: RealtimeKnowledge | undefined;
         const persist = () => {
           const now = new Date();
-          const snapshot = { connectionId: id, assetCode: waterPump.assetCode, machineId: machine._id, model, state, errorCode, lastSeenAt: now, endedAt: ended ? now : null };
+          const snapshot = { connectionId: id, assetCode: waterPump.assetCode, machineId: targetMachine._id, model, state, errorCode, lastSeenAt: now, endedAt: ended ? now : null };
           writes = writes.then(() => connections.updateOne({ connectionId: id }, { $set: snapshot, $setOnInsert: { startedAt: now } }, { upsert: true })).catch(() => {
             if (!ended) finish("error", "status_storage_failed");
           });
@@ -118,13 +138,13 @@ export async function startRealtimeRelay(options: RelayOptions) {
           void Promise.all([writes, recorder.flush()]).then(() => sessions.delete(session));
         };
         const session = { close: () => finish("disconnected", "relay_shutdown"), done: async () => { await writes; await recorder.flush(); } };
-        const recorder = new ConversationRecorder(options.db, id, { _id: machine._id, name: String(machine.name), assetCode: waterPump.assetCode }, model, () => finish("error", "conversation_storage_failed"));
+        const recorder = new ConversationRecorder(options.db, id, { _id: targetMachine._id, name: String(targetMachine.name), assetCode: waterPump.assetCode }, model, () => finish("error", "conversation_storage_failed"));
         sessions.add(session);
         persist();
         const upstreamUrl = new URL(options.upstreamUrl ?? "wss://api.openai.com/v1/realtime");
         upstreamUrl.searchParams.set("model", model);
         upstream = new WebSocket(upstreamUrl, { headers: { Authorization: `Bearer ${options.apiKey}` }, handshakeTimeout: 15000, maxPayload: 8 * 1024 * 1024, perMessageDeflate: false });
-        if (knowledgeConfig) knowledge = new RealtimeKnowledge(options.db, machine._id, knowledgeConfig,
+        if (knowledgeConfig) knowledge = new RealtimeKnowledge(options.db, targetMachine._id, knowledgeConfig,
           event => { if (!ended) send(upstream, JSON.stringify(event)); },
           event => { if (!ended) send(client, JSON.stringify(event)); }, entry => recorder.retrieval(entry));
         upstream.on("open", () => {
