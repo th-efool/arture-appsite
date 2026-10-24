@@ -2,6 +2,8 @@ import { Collection, ObjectId } from "mongodb";
 import { getArtureDb } from "@/lib/db";
 import { machineSchema, maintenanceSchema, technicianSchema } from "@/lib/schemas";
 import { phoneIdentity } from "@/lib/phone";
+import { waterPump } from "./demo-machine";
+import { artureDemoTechnicians } from "./sample-data";
 import type { KnowledgeState } from "./knowledge";
 
 export type ArtureRole = "admin" | "technician";
@@ -32,15 +34,59 @@ export const sessions = {
   async remove(tokenHash: string) { return (await collection("sessions")).deleteOne({ tokenHash }); },
 };
 export const machines = {
-  async list(filter: { assetCode?: string } = {}) { return (await collection("machines")).find({ ...filter, archivedAt: null }).sort({ createdAt: -1 }).limit(100).toArray(); },
-  async byId(id: string) { return (await collection("machines")).findOne({ _id: new ObjectId(id), archivedAt: null }); },
-  async byAssetCode(assetCode: string) { return (await collection("machines")).findOne({ assetCode: { $regex: `^${assetCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, archivedAt: null }); },
+  async list(filter: { assetCode?: string } = {}) {
+    const col = await collection("machines");
+    const existing = await col.findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+    if (!existing) {
+      const now = new Date();
+      await col.updateOne(
+        { assetCode: waterPump.assetCode },
+        { $setOnInsert: { ...waterPump, seedKey: "arture-demo-water-pump-v1", archivedAt: null, createdAt: now, updatedAt: now } },
+        { upsert: true }
+      );
+    }
+    return col.find({ ...filter, archivedAt: null }).sort({ createdAt: -1 }).limit(100).toArray();
+  },
+  async byId(id: string) {
+    const col = await collection("machines");
+    let record = await col.findOne({ _id: new ObjectId(id), archivedAt: null });
+    if (!record) {
+      const pump = await col.findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+      if (pump && pump._id.toHexString() === id) record = pump;
+    }
+    return record;
+  },
+  async byAssetCode(assetCode: string) {
+    const col = await collection("machines");
+    let record = await col.findOne({ assetCode: { $regex: `^${assetCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" }, archivedAt: null });
+    if (!record && assetCode.toUpperCase() === waterPump.assetCode) {
+      const now = new Date();
+      await col.updateOne(
+        { assetCode: waterPump.assetCode },
+        { $setOnInsert: { ...waterPump, seedKey: "arture-demo-water-pump-v1", archivedAt: null, createdAt: now, updatedAt: now } },
+        { upsert: true }
+      );
+      record = await col.findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+    }
+    return record;
+  },
   async create(input: unknown) { const data = machineSchema.parse(input); const now = new Date(); return (await collection("machines")).insertOne({ ...data, archivedAt: null, createdAt: now, updatedAt: now }); },
   async update(id: string, input: unknown) { const data = machineSchema.parse(input); return (await collection("machines")).findOneAndUpdate({ _id: new ObjectId(id), archivedAt: null }, { $set: { ...data, updatedAt: new Date() } }, { returnDocument: "after" }); },
   async archive(id: string) { return (await collection("machines")).updateOne({ _id: new ObjectId(id), archivedAt: null }, { $set: { archivedAt: new Date(), updatedAt: new Date() } }); },
 };
 export const technicians = {
-  async list() { return (await collection("technicians")).find({}).sort({ active: -1, name: 1 }).limit(100).toArray(); },
+  async list() {
+    const col = await collection("technicians");
+    const list = await col.find({}).sort({ active: -1, name: 1 }).limit(100).toArray();
+    if (list.length === 0) {
+      const now = new Date();
+      for (const worker of artureDemoTechnicians) {
+        await col.updateOne({ name: worker.name }, { $setOnInsert: { ...worker, createdAt: now, updatedAt: now } }, { upsert: true });
+      }
+      return col.find({}).sort({ active: -1, name: 1 }).limit(100).toArray();
+    }
+    return list;
+  },
   async byId(id: string) { return (await collection("technicians")).findOne({ _id: new ObjectId(id) }); },
   async matchesByPhone(phone: string) { const identity = phoneIdentity(phone); return (await collection("technicians")).find({}).limit(500).toArray().then((workers) => workers.filter((worker) => phoneIdentity(worker.phone) === identity)); },
   async create(input: unknown) { const data = technicianSchema.parse(input); const now = new Date(); return (await collection("technicians")).insertOne({ ...data, createdAt: now, updatedAt: now }); },

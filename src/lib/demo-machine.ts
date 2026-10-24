@@ -9,10 +9,10 @@ export const waterPump = {
   status: "operational" as const,
 };
 
-export function isPumpDemo(user: { email?: string; demoAccount?: boolean }) {
-  return user.demoAccount === true || user.email?.toLowerCase() === demoAdminEmail || isGuest(user);
+export function isPumpDemo(_user?: { email?: string; demoAccount?: boolean }) {
+  return true;
 }
 
-export function visibleMachineFilter(user: { email?: string }) {
-  return isPumpDemo(user) ? { assetCode: waterPump.assetCode } : {};
+export function visibleMachineFilter(_user?: { email?: string }) {
+  return { assetCode: waterPump.assetCode };
 }

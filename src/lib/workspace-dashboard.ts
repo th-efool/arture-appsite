@@ -1,10 +1,20 @@
 import type { Db } from "mongodb";
-import { visibleMachineFilter } from "./demo-machine";
+import { visibleMachineFilter, waterPump } from "./demo-machine";
 import { conversationSummary } from "./conversations";
 import { getAppConnections } from "./app-connections";
 
 export async function getWorkspaceDashboard(db: Db, user: { email?: string }) {
-  const machines = await db.collection("arture_machines").find({ ...visibleMachineFilter(user), archivedAt: null }).toArray();
+  const col = db.collection("arture_machines");
+  const existing = await col.findOne({ assetCode: waterPump.assetCode, archivedAt: null });
+  if (!existing) {
+    const now = new Date();
+    await col.updateOne(
+      { assetCode: waterPump.assetCode },
+      { $setOnInsert: { ...waterPump, seedKey: "arture-demo-water-pump-v1", archivedAt: null, createdAt: now, updatedAt: now } },
+      { upsert: true }
+    );
+  }
+  const machines = await col.find({ ...visibleMachineFilter(user), archivedAt: null }).toArray();
   const ids = machines.map(machine => machine._id);
   const machineNames = new Map(machines.map(machine => [machine._id.toHexString(), machine.name as string]));
   const logFilter = { machineId: { $in: ids }, archivedAt: null };
