@@ -40,14 +40,15 @@ export default function LoginPage() {
     const form = new FormData(event.currentTarget);
     const email = form.get("email") as string;
     const password = form.get("password") as string;
+    const name = form.get("name") as string | null;
     setLoading(true);
     setMessage("");
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(tab === "signup" ? "/api/auth/signup" : "/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(tab === "signup" ? { name, email, password } : { email, password }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Authentication failed.");
@@ -153,7 +154,7 @@ export default function LoginPage() {
                 <input
                   name="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete={tab === "signup" ? "new-password" : "current-password"}
                   value={password}
                   onChange={event => setPassword(event.target.value)}
                   minLength={12}
@@ -169,7 +170,7 @@ export default function LoginPage() {
 
               <div className="form-actions">
                 <button className="primary" disabled={loading}>
-                  <span>{loading ? "Verifying..." : tab === "login" ? "Open workspace" : "Create account"}</span>
+                  <span>{loading ? (tab === "signup" ? "Creating..." : "Verifying...") : tab === "login" ? "Open workspace" : "Create account"}</span>
                   <span aria-hidden="true">&rarr;</span>
                 </button>
               </div>

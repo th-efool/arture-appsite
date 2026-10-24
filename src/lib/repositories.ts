@@ -5,7 +5,7 @@ import { phoneIdentity } from "@/lib/phone";
 import type { KnowledgeState } from "./knowledge";
 
 export type ArtureRole = "admin" | "technician";
-export type ArtureUser = { _id?: ObjectId; email: string; name: string; passwordHash: string; role: ArtureRole; createdAt: Date; updatedAt: Date };
+export type ArtureUser = { _id?: ObjectId; email: string; name: string; passwordHash: string; role: ArtureRole; demoAccount?: boolean; createdAt: Date; updatedAt: Date };
 export type ArtureSession = { _id?: ObjectId; tokenHash: string; userId: ObjectId; expiresAt: Date; createdAt: Date };
 export type ArtureMachine = { _id?: ObjectId; assetCode: string; name: string; model: string; location: string; status: "operational" | "service_due" | "offline"; archivedAt: Date | null; createdAt: Date; updatedAt: Date; seedKey?: string };
 export type ArtureTechnician = { _id?: ObjectId; name: string; specialty: string; phone: string; active: boolean; createdAt: Date; updatedAt: Date; seedKey?: string };

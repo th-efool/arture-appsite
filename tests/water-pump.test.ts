@@ -103,6 +103,13 @@ test("pump migration preserves shared data and the authenticated workspace persi
     assert.equal((await fetch(`${origin}/api/documents`, { method: "POST", headers: guestHeaders, body: "{}" })).status, 403);
     await fetch(`${origin}/api/auth/guest`, { method: "POST" });
     assert.equal(await db.collection("arture_users").countDocuments({ email: "guest@arture.demo" }), 1);
+    const signup = await fetch(`${origin}/api/auth/signup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Pump Operator", email: "operator@example.demo", password: "operator-demo-password" }) });
+    assert.equal(signup.status, 201, await signup.clone().text());
+    const signupCookie = signup.headers.get("set-cookie")!.split(";")[0];
+    assert.equal((await fetch(`${origin}/api/auth/session`, { headers: { Cookie: signupCookie } }).then(r => r.json())).user.name, "Pump Operator");
+    const signupMachines = await fetch(`${origin}/api/machines`, { headers: { Cookie: signupCookie } }).then(r => r.json());
+    assert.equal(signupMachines.machines.length, 1); assert.equal(signupMachines.machines[0].assetCode, waterPump.assetCode);
+    assert.equal((await fetch(`${origin}/api/auth/signup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Pump Operator", email: "operator@example.demo", password: "operator-demo-password" }) })).status, 409);
 
     const headers = { Cookie: cookie, "Content-Type": "application/json" };
     const machineResponse = await fetch(`${origin}/api/machines`, { headers });

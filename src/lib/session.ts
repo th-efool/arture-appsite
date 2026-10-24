@@ -33,5 +33,5 @@ export async function getCurrentUser() {
   const session = await sessions.byTokenHash(tokenHash(token));
   if (!session) return null;
   const user = await users.byId(session.userId);
-  return user ? { id: user._id!.toHexString(), email: user.email, name: user.name, role: user.role } : null;
+  return user ? { id: user._id!.toHexString(), email: user.email, name: user.name, role: user.role, demoAccount: user.demoAccount === true } : null;
 }
