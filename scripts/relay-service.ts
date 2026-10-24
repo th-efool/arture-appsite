@@ -2,10 +2,16 @@ import { closeArtureDb, getArtureDb } from "../src/lib/db";
 import { knowledgeOptions, startKnowledgeWorker } from "../src/lib/knowledge";
 import { startRealtimeRelay } from "../src/lib/realtime-relay";
 
+if (!process.env.ARTURE_APP_URL) process.env.ARTURE_APP_URL = "http://localhost:3100";
+if (!process.env.ARTURE_AUTH_SECRET) process.env.ARTURE_AUTH_SECRET = "arture-relay-standalone-secret";
+
 async function main() {
   const db = await getArtureDb();
   const knowledge = knowledgeOptions();
-  const worker = await startKnowledgeWorker(db, knowledge);
+  const worker = await startKnowledgeWorker(db, knowledge).catch(error => {
+    console.warn("Knowledge worker failed to initialize search indexes (will continue without worker):", error?.message ?? error);
+    return { close: async () => {} };
+  });
   const relay = await startRealtimeRelay({
     db,
     apiKey: process.env.ARTURE_OPENAI_API_KEY ?? "",
@@ -29,7 +35,7 @@ async function main() {
   process.once("SIGTERM", () => void stop());
 }
 
-main().catch(() => {
-  console.error("Arture relay service failed to start. Check its MongoDB, OpenAI, relay, and knowledge configuration.");
+main().catch(error => {
+  console.error("Arture relay service failed to start:", error);
   process.exitCode = 1;
 });

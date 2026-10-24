@@ -31,11 +31,17 @@ export async function ensureKnowledgeIndexes(db: Db, vector = false) {
   await chunks.createIndex({ documentId: 1 });
   await chunks.createIndex({ workspace: 1, machineId: 1, text: "text" }, { default_language: "english" });
   if (vector) {
-    const existing = await chunks.listSearchIndexes(vectorIndexName).toArray();
-    if (!existing.length) await chunks.createSearchIndex({ name: vectorIndexName, type: "vectorSearch", definition: { fields: [
-      { type: "vector", path: "embedding", numDimensions: embeddingDimensions, similarity: "cosine" },
-      { type: "filter", path: "machineId" }, { type: "filter", path: "workspace" },
-    ] } });
+    try {
+      const existing = await chunks.listSearchIndexes(vectorIndexName).toArray().catch(() => []);
+      if (!existing.length) {
+        await chunks.createSearchIndex({ name: vectorIndexName, type: "vectorSearch", definition: { fields: [
+          { type: "vector", path: "embedding", numDimensions: embeddingDimensions, similarity: "cosine" },
+          { type: "filter", path: "machineId" }, { type: "filter", path: "workspace" },
+        ] } }).catch(() => {});
+      }
+    } catch {
+      // Atlas search index creation requires cluster permissions; ignore if not supported
+    }
   }
 }
 
