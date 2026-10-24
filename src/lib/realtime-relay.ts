@@ -6,7 +6,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import { waterPump } from "./demo-machine";
 import { ConversationRecorder, ensureConversationIndexes } from "./conversation-recorder";
 import { RealtimeKnowledge, relayKnowledgeOptions } from "./realtime-knowledge";
-import type { KnowledgeOptions } from "./knowledge";
+import { processKnowledgeJob, knowledgeOptions, type KnowledgeOptions } from "./knowledge";
 
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 export type RelayOptions = {
@@ -45,10 +45,35 @@ export async function startRealtimeRelay(options: RelayOptions) {
   const model = options.model ?? "gpt-realtime-2.1-mini";
   const heartbeatMs = options.heartbeatMs ?? 5000;
   const timeoutMs = options.timeoutMs ?? 30000;
-  const server = createServer((request, response) => {
-    if (request.url !== "/health") { response.writeHead(404).end(); return; }
-    response.writeHead(options.apiKey ? 200 : 503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    response.end(JSON.stringify({ service: "arture-realtime-relay", configured: !!options.apiKey }));
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? "/", "http://relay.local");
+    if (url.pathname === "/health") {
+      response.writeHead(options.apiKey ? 200 : 503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ service: "arture-realtime-relay", configured: !!options.apiKey }));
+      return;
+    }
+    if (url.pathname === "/api/process-job" || url.pathname === "/api/process-knowledge") {
+      try {
+        const token = request.headers.authorization?.replace(/^Bearer /i, "") ?? "";
+        if (options.accessKey && token && !matchesKey(token, options.accessKey)) {
+          response.writeHead(401, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "Unauthorized" }));
+          return;
+        }
+        const knowledgeOpts = options.knowledge === false ? knowledgeOptions() : (options.knowledge ?? knowledgeOptions());
+        let count = 0;
+        while (count < 10 && (await processKnowledgeJob(options.db, knowledgeOpts))) {
+          count++;
+        }
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ ok: true, processed: count }));
+      } catch (err: unknown) {
+        response.writeHead(500, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: (err as Error)?.message ?? "Knowledge processing failed." }));
+      }
+      return;
+    }
+    response.writeHead(404).end();
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024, perMessageDeflate: false });
   const sessions = new Set<{ close: () => void; done: () => Promise<void> }>();

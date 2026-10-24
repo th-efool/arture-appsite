@@ -1,5 +1,8 @@
 import { Db, MongoClient } from "mongodb";
+import { setDefaultResultOrder } from "node:dns";
 import { validateArtureEnvironment } from "@/lib/env";
+
+setDefaultResultOrder("ipv4first");
 
 declare global {
   var artureMongoClient: MongoClient | undefined;
@@ -19,8 +22,8 @@ export async function getArtureDb(): Promise<Db> {
       maxPoolSize: 5,
       minPoolSize: 0,
       maxIdleTimeMS: 30_000,
-      serverSelectionTimeoutMS: 5_000,
-      connectTimeoutMS: 5_000,
+      serverSelectionTimeoutMS: 15_000,
+      connectTimeoutMS: 15_000,
     });
   }
   return global.artureMongoClient.db(environment.mongodbDatabase);

@@ -6,7 +6,7 @@ import { apiError, jsonId, requireId, requireUser, ApiError } from "@/lib/api";
 import { getArtureDb } from "@/lib/db";
 import { documents, machines } from "@/lib/repositories";
 import { storeDocumentFile } from "@/lib/document-upload";
-import { queuedKnowledge, processKnowledgeJob, knowledgeOptions } from "@/lib/knowledge";
+import { queuedKnowledge, processKnowledgeJob, knowledgeOptions, triggerKnowledgeProcessing } from "@/lib/knowledge";
 
 export const runtime = "nodejs";
 
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     );
     if (hasPending) {
       const db = await getArtureDb();
-      await processKnowledgeJob(db, knowledgeOptions()).catch(() => {});
+      await triggerKnowledgeProcessing(db);
       const refreshedDocs = await documents.list(machineId ?? undefined);
       return NextResponse.json({ documents: refreshedDocs.map(jsonId) });
     }
@@ -61,13 +61,20 @@ export async function POST(request: Request) {
     });
     fileId = undefined;
 
-    // Immediately process the uploaded document synchronously so it transitions to ready without waiting for external daemon
-    const db = await getArtureDb();
-    await processKnowledgeJob(db, knowledgeOptions()).catch(err => {
-      console.warn("Direct upload processing note:", err);
-    });
+    const savedDoc = (await documents.byId(created.insertedId.toHexString()))!;
 
-    return NextResponse.json({ document: jsonId((await documents.byId(created.insertedId.toHexString()))!) }, { status: 201 });
+    // Notify Render relay to process the job in the background container
+    const relayBase = (process.env.ARTURE_RELAY_URL || "https://arture-voice-relay.onrender.com").replace(/\/+$/, "");
+    const relayKey = (process.env.ARTURE_RELAY_ACCESS_KEY || "").trim();
+    if (relayBase && !relayBase.includes("localhost")) {
+      fetch(`${relayBase}/api/process-job`, {
+        method: "POST",
+        headers: relayKey ? { Authorization: `Bearer ${relayKey}` } : {},
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => {});
+    }
+
+    return NextResponse.json({ document: jsonId(savedDoc) }, { status: 201 });
   } catch (error) {
     if (fileId) await (await bucket()).delete(fileId).catch(() => undefined);
     return apiError(error);

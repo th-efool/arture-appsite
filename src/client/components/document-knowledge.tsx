@@ -69,10 +69,10 @@ export default function DocumentKnowledge({ machineId }: { machineId: string }) 
   return <section className="detail-panel" style={{ minWidth: 0 }}>
     <p className="eyebrow">MACHINE KNOWLEDGE</p>
     <h3 style={{ margin: "6px 0 12px", fontSize: 20, fontWeight: 800 }}>Manuals, SOPs &amp; Diagrams</h3>
-    <p style={{ color: "#64748b", fontSize: 13 }}>Upload a PDF with selectable text to search this machine’s manuals with page references. Images stay available for download. Voice answers now consult these manuals and cite their sources.</p>
+    <p style={{ color: "#64748b", fontSize: 13 }}>Upload manuals, SOPs, work logs, or notes (.pdf, .txt, .md, .docx, .json, .csv) to make them searchable by the digital twin with page/section citations. Images remain downloadable. Voice answers consult these documents in real time.</p>
     {admin && <form onSubmit={upload} style={{ display: "grid", gap: 10, margin: "16px 0" }}>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>Upload a manual or diagram (up to 2 MB)
-        <input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required style={{ ...fieldStyle, marginTop: 6 }} />
+      <label style={{ fontSize: 13, fontWeight: 600 }}>Upload a document or manual (.pdf, .txt, .md, .docx, .json, .csv)
+        <input name="file" type="file" accept=".pdf,.txt,.md,.markdown,.docx,.doc,.json,.csv,image/png,image/jpeg,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required style={{ ...fieldStyle, marginTop: 6 }} />
       </label>
       <button className="btn-secondary" disabled={busy} style={{ justifySelf: "start" }}>{busy ? "Saving…" : "+ Upload Document"}</button>
     </form>}
@@ -91,7 +91,7 @@ export default function DocumentKnowledge({ machineId }: { machineId: string }) 
           {admin && <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
             {state?.status === "failed" && <button className="btn-secondary" disabled={busy} onClick={() => void mutate(async () => { await readResponse(await fetch(`/api/documents/${doc.id}/retry`, { method: "POST" })); })}>Retry processing</button>}
             <label style={{ fontSize: 12, color: "#475569", display: "grid", gap: 4 }}>Replace {doc.originalName}
-              <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={busy} style={{ fontSize: 11, maxWidth: "100%" }} onChange={event => { const file = event.currentTarget.files?.[0]; if (file) replace(doc.id, file); event.currentTarget.value = ""; }} />
+              <input type="file" accept=".pdf,.txt,.md,.markdown,.docx,.doc,.json,.csv,image/png,image/jpeg,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={busy} style={{ fontSize: 11, maxWidth: "100%" }} onChange={event => { const file = event.currentTarget.files?.[0]; if (file) replace(doc.id, file); event.currentTarget.value = ""; }} />
             </label>
             <button disabled={busy} onClick={() => remove(doc.id)} style={{ color: "#b91c1c", fontSize: 12 }} aria-label={`Delete ${doc.originalName}`}>Delete</button>
           </div>}

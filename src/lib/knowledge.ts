@@ -2,6 +2,7 @@ import { Db, GridFSBucket, ObjectId } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { setDefaultResultOrder } from "node:dns";
+import { inflateSync } from "node:zlib";
 
 export type KnowledgeState = {
   status: "queued" | "processing" | "ready" | "failed";
@@ -102,29 +103,157 @@ async function extractPdfSubprocess(data: Buffer): Promise<PageText[]> {
   });
 }
 
+export function extractPdfStreamText(data: Buffer): PageText[] {
+  try {
+    const raw = data.toString("latin1");
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let match: RegExpExecArray | null;
+    const pageTexts: string[] = [];
+
+    while ((match = streamRegex.exec(raw)) !== null) {
+      let content = match[1];
+      const streamStart = match.index;
+      const dictSearch = raw.slice(Math.max(0, streamStart - 200), streamStart);
+      if (/FlateDecode/.test(dictSearch)) {
+        try {
+          content = inflateSync(Buffer.from(content, "latin1")).toString("latin1");
+        } catch {
+          // If uncompressing fails, keep raw content
+        }
+      }
+
+      const textPieces: string[] = [];
+      const tjRegex = /\(([^)]*)\)\s*Tj/g;
+      let tj: RegExpExecArray | null;
+      while ((tj = tjRegex.exec(content)) !== null) {
+        if (tj[1]) textPieces.push(tj[1].replace(/\\([\\()])/g, "$1"));
+      }
+
+      const arrayTjRegex = /\[(.*?)\]\s*TJ/g;
+      let atj: RegExpExecArray | null;
+      while ((atj = arrayTjRegex.exec(content)) !== null) {
+        const innerRegex = /\(([^)]*)\)/g;
+        let inner: RegExpExecArray | null;
+        while ((inner = innerRegex.exec(atj[1])) !== null) {
+          if (inner[1]) textPieces.push(inner[1].replace(/\\([\\()])/g, "$1"));
+        }
+      }
+
+      if (textPieces.length > 0) {
+        pageTexts.push(textPieces.join(" ").trim());
+      }
+    }
+
+    if (pageTexts.length > 0) {
+      return pageTexts.map((text, idx) => ({ num: idx + 1, text }));
+    }
+  } catch {}
+  return [];
+}
+
 export async function extractPdf(data: Buffer): Promise<PageText[]> {
   try {
     return await extractPdfInProcess(data);
-  } catch (err) {
-    return await extractPdfSubprocess(data);
+  } catch {
+    try {
+      return await extractPdfSubprocess(data);
+    } catch {
+      const fallback = extractPdfStreamText(data);
+      if (fallback.length > 0 && fallback.some(p => p.text.trim().length > 0)) {
+        return fallback;
+      }
+      throw new Error("Cannot read this PDF. Use an unlocked, valid text PDF of at most 200 pages.");
+    }
   }
+}
+
+export function splitTextIntoPages(text: string, charsPerPage = 2000): PageText[] {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("No readable text found in document.");
+  const formFeedPages = trimmed.split("\x0c");
+  if (formFeedPages.length > 1) {
+    return formFeedPages.map((pageStr, idx) => ({
+      num: idx + 1,
+      text: pageStr.trim() || `(Page ${idx + 1})`
+    }));
+  }
+
+  const paragraphs = trimmed.split(/\n\s*\n/);
+  const pages: PageText[] = [];
+  let currentText = "";
+  let pageNum = 1;
+
+  for (const p of paragraphs) {
+    const pTrim = p.trim();
+    if (!pTrim) continue;
+    if (currentText && (currentText.length + pTrim.length > charsPerPage)) {
+      pages.push({ num: pageNum++, text: currentText });
+      currentText = pTrim;
+    } else {
+      currentText = currentText ? `${currentText}\n\n${pTrim}` : pTrim;
+    }
+    if (pageNum > 200) break;
+  }
+
+  if (currentText) {
+    pages.push({ num: pageNum, text: currentText });
+  }
+
+  return pages.length ? pages : [{ num: 1, text: trimmed }];
+}
+
+export function extractPlainText(data: Buffer): PageText[] {
+  const text = data.toString("utf-8");
+  if (!text.trim()) {
+    throw new Error("No readable text found in document.");
+  }
+  return splitTextIntoPages(text);
+}
+
+export async function extractDocx(data: Buffer): Promise<PageText[]> {
+  try {
+    const mammoth = await import("mammoth");
+    const result = await mammoth.extractRawText({ buffer: data });
+    const text = result.value || "";
+    if (!text.trim()) {
+      throw new Error("No readable text found in Word document.");
+    }
+    return splitTextIntoPages(text);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("No readable text")) throw error;
+    throw new Error("Cannot read this Word document. Ensure it is a valid .docx file.");
+  }
+}
+
+export async function extractDocumentText(data: Buffer, mimeType: string, filename?: string): Promise<PageText[]> {
+  const ext = (filename || "").split(".").pop()?.toLowerCase();
+  if (mimeType === "application/pdf" || ext === "pdf") {
+    return extractPdf(data);
+  }
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    ext === "docx"
+  ) {
+    return extractDocx(data);
+  }
+  return extractPlainText(data);
 }
 
 export function chunkPages(pages: PageText[]) {
   const result: { page: number; text: string; ordinal: number }[] = [];
-  if (pages.length > 200) throw new Error("PDF exceeds the 200-page limit.");
+  if (pages.length > 200) throw new Error("Document exceeds the 200-page limit.");
   for (const page of pages) {
     const text = page.text.replace(/\s+/g, " ").trim();
     for (let start = 0; start < text.length;) {
       let end = Math.min(start + 1500, text.length);
       if (end < text.length) { const boundary = text.lastIndexOf(" ", end); if (boundary > start + 900) end = boundary; }
       result.push({ page: page.num, text: text.slice(start, end), ordinal: result.length });
-      if (result.length > 1000) throw new Error("PDF exceeds the searchable text limit. Split it into smaller manuals.");
+      if (result.length > 1000) throw new Error("Document exceeds the searchable text limit. Split it into smaller manuals.");
       if (end === text.length) break;
       start = end - 180;
     }
   }
-  if (!result.some(chunk => /[\p{L}\p{N}]{3}/u.test(chunk.text))) throw new Error("No readable text found. Scanned PDFs and images need OCR; upload a PDF with selectable text.");
+  if (!result.some(chunk => /[\p{L}\p{N}]{3}/u.test(chunk.text))) throw new Error("No readable text found. Scanned PDFs and images need OCR; upload a document with selectable text.");
   return result;
 }
 
@@ -168,11 +297,18 @@ export async function processKnowledgeJob(db: Db, options: KnowledgeOptions): Pr
   try {
     if (doc.knowledge?.generation) await db.collection("arture_knowledge_chunks").deleteMany({ generation: doc.knowledge.generation });
     if (doc.knowledge!.attempts >= 5) throw new Error("Processing repeatedly stopped. Retry to start a new attempt.");
-    if (doc.mimeType !== "application/pdf") throw new Error("Image stored for download. Search needs a PDF with selectable text; OCR is not enabled.");
+    if (doc.mimeType?.startsWith("image/")) {
+      throw new Error("Image stored for download. Search needs a text document or PDF with selectable text; OCR is not enabled.");
+    }
     const storage = new GridFSBucket(db, { bucketName: "arture_documents" });
     const buffers: Buffer[] = []; let size = 0;
-    for await (const part of storage.openDownloadStream(doc.gridFsFileId)) { size += part.length; if (size > 10_000_000) throw new Error("Document is too large to process."); buffers.push(part); }
-    const pages = await (options.extract ?? extractPdf)(Buffer.concat(buffers));
+    for await (const part of storage.openDownloadStream(doc.gridFsFileId)) {
+      size += part.length;
+      if (size > 10_000_000) throw new Error("Document is too large to process.");
+      buffers.push(part);
+    }
+    const rawBuffer = Buffer.concat(buffers);
+    const pages = await (options.extract ? options.extract(rawBuffer) : extractDocumentText(rawBuffer, doc.mimeType, doc.originalName));
     const chunks = chunkPages(pages);
     const embed = options.embed ?? ((texts: string[]) => embedTexts(texts, options.apiKey));
     const vectors: number[][] = [];
@@ -226,20 +362,17 @@ export async function searchKnowledge(db: Db, machineId: ObjectId, query: string
   if (options.mode === "vector") {
     const vector = (await (options.embed ?? ((texts: string[]) => embedTexts(texts, options.apiKey, options.signal)))([query]))[0];
     if (options.vectorBackend === "local") {
-      // Exact scoring for the small local corpus. OpenAI vectors have unit length.
       first = [{ $match: { ...filter, embedding: { $exists: true } } }, { $set: { score: { $sum: { $map: { input: { $range: [0, embeddingDimensions] }, as: "i", in: { $multiply: [{ $arrayElemAt: ["$embedding", "$$i"] }, { $arrayElemAt: [{ $literal: vector }, "$$i"] }] } } } } } }, { $sort: { score: -1 } }, { $limit: 30 }];
     } else {
       try {
         first = [{ $vectorSearch: { index: vectorIndexName, path: "embedding", queryVector: vector, numCandidates: 100, limit: 30, filter } }, { $set: { score: { $meta: "vectorSearchScore" } } }];
-        // Test query execution; falls back if index is not ready on cluster
         await db.collection("arture_knowledge_chunks").aggregate(first, { maxTimeMS: 5000 }).toArray();
       } catch {
         first = [{ $match: { ...filter, embedding: { $exists: true } } }, { $set: { score: { $sum: { $map: { input: { $range: [0, embeddingDimensions] }, as: "i", in: { $multiply: [{ $arrayElemAt: ["$embedding", "$$i"] }, { $arrayElemAt: [{ $literal: vector }, "$$i"] }] } } } } } }, { $sort: { score: -1 } }, { $limit: 30 }];
       }
     }
   } else first = [{ $match: { ...filter, $text: { $search: query } } }, { $set: { score: { $meta: "textScore" } } }, { $sort: { score: -1 } }, { $limit: 30 }];
-  // Revalidate against authoritative metadata after the search index. Deleted/replaced versions
-  // are excluded even while Atlas is still updating its eventually consistent search index.
+
   const found = await db.collection("arture_knowledge_chunks").aggregate([...first,
     { $lookup: { from: "arture_document_records", localField: "documentId", foreignField: "_id", as: "source" } }, { $unwind: "$source" },
     { $match: { "source.machineId": machineId, "source.knowledge.status": "ready", "source.knowledge.mode": options.mode, $expr: { $and: [{ $eq: ["$generation", "$source.knowledge.generation"] }, { $eq: ["$revision", "$source.knowledge.revision"] }] } } },
@@ -247,3 +380,25 @@ export async function searchKnowledge(db: Db, machineId: ObjectId, query: string
   ], { maxTimeMS: 10_000 }).toArray();
   return { mode: options.mode, backend: options.mode === "keyword" ? "local" : options.vectorBackend ?? "atlas", results: found.map(hit => ({ documentId: hit.documentId.toHexString(), originalName: hit.originalName, page: hit.page, text: hit.text, score: hit.score, revision: hit.revision, downloadUrl: `/api/documents/${hit.documentId}/download` })) };
 }
+
+export async function triggerKnowledgeProcessing(db: Db): Promise<void> {
+  const relayBase = (process.env.ARTURE_RELAY_URL || "https://arture-voice-relay.onrender.com").replace(/\/+$/, "");
+  const relayKey = (process.env.ARTURE_RELAY_ACCESS_KEY || "").trim();
+
+  if (relayBase && !relayBase.includes("localhost")) {
+    fetch(`${relayBase}/api/process-job`, {
+      method: "POST",
+      headers: relayKey ? { Authorization: `Bearer ${relayKey}` } : {},
+      signal: AbortSignal.timeout(4000),
+    }).catch(() => {
+      // Fire-and-forget; background worker on Render also checks MongoDB continuously
+    });
+  }
+
+  try {
+    await processKnowledgeJob(db, knowledgeOptions());
+  } catch (err) {
+    console.warn("Direct in-process knowledge processing warning:", (err as Error)?.message ?? err);
+  }
+}
+

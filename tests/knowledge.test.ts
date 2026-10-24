@@ -118,3 +118,22 @@ test("embedding requests use the configured contract, retry a transient outage, 
   await assert.rejects(embedTexts(["test"], "isolated-test-key"), /invalid vectors/);
   await assert.rejects(embedTexts(["test"]), /missing/);
 });
+
+test("plain text and markdown documents are indexed and searchable", async () => {
+  const db = await setup();
+  const machineId = new ObjectId();
+  const mdContent = Buffer.from("# Centrifugal Water Pump Safety\n\nEnsure suction valve is open before starting the electric motor.");
+  const stream = new GridFSBucket(db, { bucketName: "arture_documents" }).openUploadStream("safety-guidelines.md");
+  await new Promise<void>((resolve, reject) => { stream.on("finish", resolve); stream.on("error", reject); stream.end(mdContent); });
+  const doc = { _id: new ObjectId(), machineId, gridFsFileId: stream.id, originalName: "safety-guidelines.md", mimeType: "text/markdown", knowledge: queuedKnowledge(), createdAt: new Date() };
+  await db.collection("arture_document_records").insertOne(doc);
+
+  assert.equal(await processKnowledgeJob(db, { mode: "keyword" }), true);
+  const ready = await db.collection("arture_document_records").findOne({ _id: doc._id });
+  assert.equal(ready?.knowledge.status, "ready");
+
+  const search = await searchKnowledge(db, machineId, "suction valve", { mode: "keyword" });
+  assert.equal(search.results.length, 1);
+  assert.match(search.results[0].text, /suction valve/i);
+});
+

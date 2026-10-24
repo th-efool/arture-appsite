@@ -9,7 +9,7 @@
 [![OpenAI Realtime](https://img.shields.io/badge/OpenAI-Realtime_Voice-412991?style=for-the-badge&logo=openai&logoColor=white)](https://developers.openai.com/api/docs/guides/voice-websockets)
 [![Railway](https://img.shields.io/badge/Railway-Deploy_Relay-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app/)
 [![Vercel](https://img.shields.io/badge/Vercel-Web_App-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
-[![Test Suite](https://img.shields.io/badge/Tests-26_Passed_•_100%25-059669?style=for-the-badge)](https://nodejs.org/api/test.html)
+[![Test Suite](https://img.shields.io/badge/Tests-27_Passed_•_100%25-059669?style=for-the-badge)](https://nodejs.org/api/test.html)
 
 </div>
 
@@ -20,7 +20,7 @@
 This repository powers:
 1. **The Web Workspace**: An industrial control dashboard managing machine twins, uploaded technical manuals, technician work events, and historical voice sessions.
 2. **The Realtime Voice Relay**: A persistent, bi-directional WebSocket server (`:3101`) that tunnels 24 kHz PCM audio between Unity AR and OpenAI Realtime while keeping private credentials off client devices.
-3. **The Document Ingestion & Vector RAG Engine**: An automated background worker that extracts text page-by-page from uploaded PDFs and generates 1536-dimensional embeddings.
+3. **The Document Ingestion & Vector RAG Engine**: An automated background worker that extracts text page-by-page from uploaded documents (PDF, DOCX, Markdown, TXT, JSON, CSV) and generates 1536-dimensional embeddings.
 4. **The Grounded Voice Orchestrator**: A two-step turn coordinator that forces the AI assistant to search uploaded manuals, quote exact PDF page numbers, and trigger 3D component highlights in AR before speaking.
 
 ---
