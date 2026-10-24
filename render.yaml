@@ -1,0 +1,7 @@
+services:
+  - type: web
+    runtime: docker
+    name: arture-voice-relay
+    dockerfilePath: ./Dockerfile.relay
+    healthCheckPath: /health
+    autoDeployTrigger: commit

@@ -19,6 +19,7 @@
     "start:local": "tsx scripts/local-workspace.ts",
     "dev:local": "tsx scripts/local-workspace.ts --dev",
     "relay": "node --env-file=.env.local --import tsx scripts/realtime-relay.ts",
+    "relay:service": "node --import tsx scripts/relay-service.ts",
     "test:relay": "tsx --test tests/realtime-relay.test.ts",
     "relay:check": "node --env-file=.env.local --import tsx scripts/check-voice-relay.ts",
     "relay:configure-unity": "node --env-file=.env.local --import tsx scripts/configure-unity-relay.ts",

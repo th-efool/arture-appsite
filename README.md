@@ -18,7 +18,7 @@
 This repository powers:
 1. **The Web Workspace**: An industrial dashboard managing machine twins, uploaded technical manuals, technician work events, and historical voice sessions.
 2. **The Realtime Voice Relay**: A persistent, bi-directional WebSocket server (`:3101`) that tunnels 24 kHz PCM audio between Unity and OpenAI Realtime while keeping secret keys off client devices.
-3. **The Document Ingestion & Vector RAG Engine**: An automated background worker that extracts text page-by-page from uploaded PDFs, generates 1536-dimensional embeddings, and powers sub-5ms semantic lookups.
+3. **The Document Ingestion & Vector RAG Engine**: An automated background worker that extracts text page-by-page from uploaded PDFs and generates 1536-dimensional embeddings.
 4. **The Grounded Voice Orchestrator**: A two-step turn coordinator that forces the AI assistant to search uploaded manuals, quote exact PDF page numbers, and trigger 3D component highlights in AR before speaking.
 
 ---
@@ -230,10 +230,11 @@ For production deployments using MongoDB Atlas and dedicated cloud containers:
    npm run db:indexes
    npm run db:migrate:water-pump
    ```
-3. Run the three services in production:
-   - **Next.js Website**: `npm run start` (port 3100)
-   - **Voice Relay**: `npm run relay` (port 3101)
-   - **Knowledge Worker**: `npm run knowledge:worker`
+3. Deploy the services separately:
+   - **Vercel** hosts the Next.js website only. Set `ARTURE_APP_URL=https://arture-appsite.vercel.app` and the same MongoDB/auth/demo variables there.
+   - **A persistent container host** runs `npm run relay:service`. It starts the WebSocket relay and document worker together, listens on the platform-provided `PORT`, and exposes `/health`.
+   - `Dockerfile.relay` and `render.yaml` are ready for a Render Web Service. Give that service the same MongoDB, OpenAI, relay-key, and Atlas-vector variables, then copy its public `wss://.../realtime` address into `ARTURE_RELAY_URL` before running `npm run relay:configure-unity`.
+   - Vercel Functions cannot accept the long-lived WebSocket upgrades needed by Realtime voice, so do not point Unity at `arture-appsite.vercel.app`.
 
 ---
 
@@ -278,7 +279,7 @@ This scans your local network interfaces, detects your machine's LAN IP, and upd
 
 ## 📡 REST & WebSocket API Reference
 
-### Realtime Voice WebSocket (`ws://localhost:3101/realtime`)
+### Realtime Voice WebSocket (`wss://YOUR-RELAY-HOST/realtime` in production)
 - **Headers**: `Authorization: Bearer <ARTURE_RELAY_ACCESS_KEY>`
 - **Query Params**: `assetCode=ATR-DEMO-PUMP-001`
 - **Supported Client Events**:
