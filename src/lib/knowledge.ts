@@ -14,30 +14,47 @@ export type KnowledgeOptions = { mode: "keyword" | "vector"; vectorBackend?: "at
 export const vectorIndexName = "arture_pump_vectors_v1";
 export const embeddingModel = "text-embedding-3-small";
 export const embeddingDimensions = 1536;
+
 export function knowledgeOptions(): KnowledgeOptions {
-  const mode = process.env.ARTURE_KNOWLEDGE_MODE ?? "vector";
-  if (mode !== "keyword" && mode !== "vector") throw new Error("ARTURE_KNOWLEDGE_MODE must be keyword or vector.");
-  const vectorBackend = process.env.ARTURE_KNOWLEDGE_VECTOR_BACKEND ?? "atlas";
-  if (vectorBackend !== "atlas" && vectorBackend !== "local") throw new Error("ARTURE_KNOWLEDGE_VECTOR_BACKEND must be atlas or local.");
-  return { mode, vectorBackend, apiKey: process.env.ARTURE_OPENAI_API_KEY };
+  const apiKey = (process.env.ARTURE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "").replace(/^"|"$/g, "").trim();
+  let mode = process.env.ARTURE_KNOWLEDGE_MODE ?? (apiKey ? "vector" : "keyword");
+  if (!apiKey && mode === "vector") {
+    console.warn("OpenAI API key missing; falling back knowledge mode to 'keyword'");
+    mode = "keyword";
+  }
+  const vectorBackend = process.env.ARTURE_KNOWLEDGE_VECTOR_BACKEND ?? (mode === "vector" ? "atlas" : "local");
+  return { mode: mode as "vector" | "keyword", vectorBackend: vectorBackend as "atlas" | "local", apiKey };
 }
+
 export function queuedKnowledge(revision = 1): KnowledgeState {
   return { status: "queued", revision, attempts: 0, updatedAt: new Date() };
 }
+
 export async function ensureKnowledgeIndexes(db: Db, vector = false) {
-  await db.collection("arture_document_records").createIndex({ "knowledge.status": 1, "knowledge.leaseUntil": 1 });
+  try {
+    await db.collection("arture_document_records").createIndex({ "knowledge.status": 1, "knowledge.leaseUntil": 1 });
+  } catch {}
   const chunks = db.collection("arture_knowledge_chunks");
-  await chunks.createIndex({ generation: 1, ordinal: 1 }, { unique: true });
-  await chunks.createIndex({ documentId: 1 });
-  await chunks.createIndex({ workspace: 1, machineId: 1, text: "text" }, { default_language: "english" });
+  try {
+    await chunks.createIndex({ generation: 1, ordinal: 1 }, { unique: true });
+    await chunks.createIndex({ documentId: 1 });
+    await chunks.createIndex({ workspace: 1, machineId: 1, text: "text" }, { default_language: "english" });
+  } catch {}
   if (vector) {
     try {
       const existing = await chunks.listSearchIndexes(vectorIndexName).toArray().catch(() => []);
       if (!existing.length) {
-        await chunks.createSearchIndex({ name: vectorIndexName, type: "vectorSearch", definition: { fields: [
-          { type: "vector", path: "embedding", numDimensions: embeddingDimensions, similarity: "cosine" },
-          { type: "filter", path: "machineId" }, { type: "filter", path: "workspace" },
-        ] } }).catch(() => {});
+        await chunks.createSearchIndex({
+          name: vectorIndexName,
+          type: "vectorSearch",
+          definition: {
+            fields: [
+              { type: "vector", path: "embedding", numDimensions: embeddingDimensions, similarity: "cosine" },
+              { type: "filter", path: "machineId" },
+              { type: "filter", path: "workspace" },
+            ],
+          },
+        }).catch(() => {});
       }
     } catch {
       // Atlas search index creation requires cluster permissions; ignore if not supported
@@ -45,8 +62,22 @@ export async function ensureKnowledgeIndexes(db: Db, vector = false) {
   }
 }
 
-// Parsing happens in a separate, memory-limited process. An uploaded PDF cannot block the web server.
-export async function extractPdf(data: Buffer): Promise<PageText[]> {
+// In-process extraction using pdf-parse (fast, reliable in serverless and containers)
+async function extractPdfInProcess(data: Buffer): Promise<PageText[]> {
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data, isEvalSupported: false });
+  try {
+    const info = await parser.getInfo();
+    if (info.total > 200) throw new Error("Too many pages");
+    const result = await parser.getText();
+    return result.pages.map(p => ({ num: p.num, text: p.text }));
+  } finally {
+    await parser.destroy();
+  }
+}
+
+// Fallback subprocess extraction if required
+async function extractPdfSubprocess(data: Buffer): Promise<PageText[]> {
   const script = `import {PDFParse} from 'pdf-parse';
     const parts=[]; for await(const part of process.stdin) parts.push(part);
     const parser=new PDFParse({data:Buffer.concat(parts),isEvalSupported:false});
@@ -59,7 +90,7 @@ export async function extractPdf(data: Buffer): Promise<PageText[]> {
     let output = ""; let size = 0; let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill(); }, 35_000);
     child.stdout.on("data", part => { size += part.length; if (size > 3_000_000) child.kill(); else output += part.toString(); });
-    child.stderr.resume(); // Parser diagnostics may contain uploaded text; do not put them in logs.
+    child.stderr.resume();
     child.stdin.on("error", () => undefined);
     child.on("error", error => { clearTimeout(timer); reject(error); });
     child.on("close", code => {
@@ -69,6 +100,14 @@ export async function extractPdf(data: Buffer): Promise<PageText[]> {
     });
     child.stdin.end(data);
   });
+}
+
+export async function extractPdf(data: Buffer): Promise<PageText[]> {
+  try {
+    return await extractPdfInProcess(data);
+  } catch (err) {
+    return await extractPdfSubprocess(data);
+  }
 }
 
 export function chunkPages(pages: PageText[]) {
@@ -158,22 +197,27 @@ export async function retryKnowledge(db: Db, id: ObjectId) {
   if (previous?.knowledge?.generation) await db.collection("arture_knowledge_chunks").deleteMany({ generation: previous.knowledge.generation });
   return !!previous;
 }
+
 export async function startKnowledgeWorker(db: Db, options: KnowledgeOptions, onError: () => void = () => console.error("Knowledge worker storage error; retrying.")) {
-  await ensureKnowledgeIndexes(db, options.mode === "vector" && options.vectorBackend !== "local");
-  // Existing uploads become durable jobs on upgrade. Never modifies other applications' collections.
-  await db.collection("arture_document_records").updateMany({ knowledge: { $exists: false }, gridFsFileId: { $exists: true } }, { $set: { knowledge: queuedKnowledge() } });
-  await db.collection("arture_document_records").updateMany({ "knowledge.status": "ready", "knowledge.mode": { $ne: options.mode } }, { $set: { "knowledge.status": "queued", "knowledge.attempts": 0, "knowledge.updatedAt": new Date() }, $inc: { "knowledge.revision": 1 } });
+  try {
+    await ensureKnowledgeIndexes(db, options.mode === "vector" && options.vectorBackend !== "local");
+    await db.collection("arture_document_records").updateMany({ knowledge: { $exists: false }, gridFsFileId: { $exists: true } }, { $set: { knowledge: queuedKnowledge() } });
+    await db.collection("arture_document_records").updateMany({ "knowledge.status": "ready", "knowledge.mode": { $ne: options.mode } }, { $set: { "knowledge.status": "queued", "knowledge.attempts": 0, "knowledge.updatedAt": new Date() }, $inc: { "knowledge.revision": 1 } });
+  } catch (err: unknown) {
+    console.warn("Knowledge worker index setup warning (will continue worker loop):", (err as Error)?.message ?? err);
+  }
   let stopping = false; let wake: (() => void) | undefined;
   const loop = (async () => {
     while (!stopping) {
-      try { if (await processKnowledgeJob(db, options)) continue; } catch { onError(); }
-      await new Promise<void>(resolve => { const timer = setTimeout(() => { wake = undefined; resolve(); }, 1000); wake = () => { clearTimeout(timer); resolve(); }; });
+      try { if (await processKnowledgeJob(db, options)) continue; } catch (e) { onError(); }
+      await new Promise<void>(resolve => { const timer = setTimeout(() => { wake = undefined; resolve(); }, 1500); wake = () => { clearTimeout(timer); resolve(); }; });
     }
   })();
   return { close: async () => { stopping = true; wake?.(); await loop; } };
 }
 
 export type KnowledgeHit = { documentId: string; originalName: string; page: number; text: string; score: number; revision: number; downloadUrl: string };
+
 export async function searchKnowledge(db: Db, machineId: ObjectId, query: string, options: KnowledgeOptions): Promise<{ mode: string; backend: string; results: KnowledgeHit[] }> {
   if (!query.trim() || query.length > 500) throw new Error("Search must contain 1–500 characters.");
   if (!await db.collection("arture_document_records").findOne({ machineId, "knowledge.status": "ready", "knowledge.mode": options.mode }, { projection: { _id: 1 } })) return { mode: options.mode, backend: options.mode === "keyword" ? "local" : options.vectorBackend ?? "atlas", results: [] };
@@ -184,7 +228,15 @@ export async function searchKnowledge(db: Db, machineId: ObjectId, query: string
     if (options.vectorBackend === "local") {
       // Exact scoring for the small local corpus. OpenAI vectors have unit length.
       first = [{ $match: { ...filter, embedding: { $exists: true } } }, { $set: { score: { $sum: { $map: { input: { $range: [0, embeddingDimensions] }, as: "i", in: { $multiply: [{ $arrayElemAt: ["$embedding", "$$i"] }, { $arrayElemAt: [{ $literal: vector }, "$$i"] }] } } } } } }, { $sort: { score: -1 } }, { $limit: 30 }];
-    } else first = [{ $vectorSearch: { index: vectorIndexName, path: "embedding", queryVector: vector, numCandidates: 100, limit: 30, filter } }, { $set: { score: { $meta: "vectorSearchScore" } } }];
+    } else {
+      try {
+        first = [{ $vectorSearch: { index: vectorIndexName, path: "embedding", queryVector: vector, numCandidates: 100, limit: 30, filter } }, { $set: { score: { $meta: "vectorSearchScore" } } }];
+        // Test query execution; falls back if index is not ready on cluster
+        await db.collection("arture_knowledge_chunks").aggregate(first, { maxTimeMS: 5000 }).toArray();
+      } catch {
+        first = [{ $match: { ...filter, embedding: { $exists: true } } }, { $set: { score: { $sum: { $map: { input: { $range: [0, embeddingDimensions] }, as: "i", in: { $multiply: [{ $arrayElemAt: ["$embedding", "$$i"] }, { $arrayElemAt: [{ $literal: vector }, "$$i"] }] } } } } } }, { $sort: { score: -1 } }, { $limit: 30 }];
+      }
+    }
   } else first = [{ $match: { ...filter, $text: { $search: query } } }, { $set: { score: { $meta: "textScore" } } }, { $sort: { score: -1 } }, { $limit: 30 }];
   // Revalidate against authoritative metadata after the search index. Deleted/replaced versions
   // are excluded even while Atlas is still updating its eventually consistent search index.

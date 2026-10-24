@@ -8,10 +8,14 @@ if (!process.env.ARTURE_AUTH_SECRET) process.env.ARTURE_AUTH_SECRET = "arture-re
 async function main() {
   const db = await getArtureDb();
   const knowledge = knowledgeOptions();
-  const worker = await startKnowledgeWorker(db, knowledge).catch(error => {
-    console.warn("Knowledge worker failed to initialize search indexes (will continue without worker):", error?.message ?? error);
-    return { close: async () => {} };
-  });
+  let worker = { close: async () => {} };
+  try {
+    worker = await startKnowledgeWorker(db, knowledge);
+    console.log("Arture knowledge worker started successfully.");
+  } catch (error) {
+    console.warn("Knowledge worker note:", error);
+  }
+
   const relay = await startRealtimeRelay({
     db,
     apiKey: process.env.ARTURE_OPENAI_API_KEY ?? "",
