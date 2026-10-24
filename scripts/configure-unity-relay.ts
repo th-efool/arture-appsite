@@ -9,8 +9,8 @@ async function main() {
   if (!token || token.length < 24) throw new Error("Set an Arture app credential.");
   const localAddress = Object.values(networkInterfaces()).flat().find(address => address?.family === "IPv4" && !address.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(address.address))?.address;
   const port = process.env.ARTURE_RELAY_PORT ?? "3101";
-  const url = process.env.ARTURE_RELAY_URL ?? `ws://127.0.0.1:${port}/realtime`;
-  const deviceUrl = process.env.ARTURE_RELAY_DEVICE_URL ?? (localAddress ? `ws://${localAddress}:${port}/realtime` : url);
+  const url = process.env.ARTURE_RELAY_URL ?? "wss://arture-voice-relay.onrender.com/realtime";
+  const deviceUrl = process.env.ARTURE_RELAY_DEVICE_URL ?? url;
   for (const candidate of [url, deviceUrl]) { const parsed = new URL(candidate); if (!["ws:", "wss:"].includes(parsed.protocol)) throw new Error("Use a ws:// or wss:// relay URL."); }
   const configPath = resolve(project, "Assets/Resources/ArtureRelayConnection.json");
   const ignorePath = resolve(project, ".gitignore");
