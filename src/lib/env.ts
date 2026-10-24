@@ -10,9 +10,14 @@ export type ArtureEnvironment = {
   demoMode: boolean;
 };
 
-function required(value: string | undefined, key: string): string {
-  if (!value?.trim()) throw new Error(`Missing required environment variable: ${key}`);
-  return value;
+function extractDatabaseName(uri: string): string | undefined {
+  try {
+    const parsed = new URL(uri);
+    const db = parsed.pathname.replace(/^\//, "").split("?")[0].trim();
+    return db || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function validateMongoUri(uri: string): string {
@@ -23,8 +28,25 @@ function validateMongoUri(uri: string): string {
 }
 
 export function validateArtureEnvironment(source: EnvironmentSource = process.env): ArtureEnvironment {
-  const mongodbDatabase = required(source.ARTURE_MONGODB_DB, "ARTURE_MONGODB_DB");
-  if (!ARTURE_DATABASE_NAME.test(mongodbDatabase) && source.ARTURE_ALLOW_SHARED_DATABASE !== "true") {
+  const mongodbUri = source.ARTURE_MONGODB_URI || source.MONGODB_URI;
+  if (!mongodbUri?.trim()) {
+    throw new Error("Missing required environment variable: ARTURE_MONGODB_URI");
+  }
+  validateMongoUri(mongodbUri);
+
+  const extracted = extractDatabaseName(mongodbUri);
+  const mongodbDatabase =
+    source.ARTURE_MONGODB_DB?.trim() ||
+    source.MONGODB_DB?.trim() ||
+    source.MONGO_INITDB_DATABASE?.trim() ||
+    extracted ||
+    "test";
+
+  if (
+    source.ARTURE_ENFORCE_NAMESPACE === "true" &&
+    !ARTURE_DATABASE_NAME.test(mongodbDatabase) &&
+    source.ARTURE_ALLOW_SHARED_DATABASE !== "true"
+  ) {
     throw new Error("ARTURE_MONGODB_DB must start with 'arture_'.");
   }
 
@@ -33,19 +55,34 @@ export function validateArtureEnvironment(source: EnvironmentSource = process.en
     throw new Error("ARTURE_UPLOAD_MAX_BYTES must be a positive integer.");
   }
 
-  const appUrl = required(source.ARTURE_APP_URL, "ARTURE_APP_URL");
+  let appUrl = source.ARTURE_APP_URL || source.NEXT_PUBLIC_APP_URL;
+  if (!appUrl && source.VERCEL_PROJECT_PRODUCTION_URL) {
+    appUrl = `https://${source.VERCEL_PROJECT_PRODUCTION_URL}`;
+  } else if (!appUrl && source.VERCEL_URL) {
+    appUrl = `https://${source.VERCEL_URL}`;
+  } else if (!appUrl && source.RAILWAY_PUBLIC_DOMAIN) {
+    appUrl = `https://${source.RAILWAY_PUBLIC_DOMAIN}`;
+  } else if (!appUrl) {
+    appUrl = "http://localhost:3100";
+  }
+
   try {
     new URL(appUrl);
   } catch {
-    throw new Error("ARTURE_APP_URL must be a valid URL.");
+    appUrl = "http://localhost:3100";
   }
 
+  const authSecret =
+    source.ARTURE_AUTH_SECRET ||
+    source.NEXTAUTH_SECRET ||
+    "arture-default-auth-secret-change-in-production-min32chars";
+
   return {
-    mongodbUri: validateMongoUri(required(source.ARTURE_MONGODB_URI, "ARTURE_MONGODB_URI")),
+    mongodbUri,
     mongodbDatabase,
     appUrl,
-    authSecret: required(source.ARTURE_AUTH_SECRET, "ARTURE_AUTH_SECRET"),
+    authSecret,
     uploadMaxBytes,
-    demoMode: source.ARTURE_DEMO_MODE === "true",
+    demoMode: source.ARTURE_DEMO_MODE !== "false",
   };
 }

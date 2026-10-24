@@ -7,7 +7,11 @@ declare global {
 
 export async function getArtureDb(): Promise<Db> {
   const environment = validateArtureEnvironment();
-  if (!environment.mongodbDatabase.startsWith("arture_") && process.env.ARTURE_ALLOW_SHARED_DATABASE !== "true") {
+  if (
+    process.env.ARTURE_ENFORCE_NAMESPACE === "true" &&
+    !environment.mongodbDatabase.startsWith("arture_") &&
+    process.env.ARTURE_ALLOW_SHARED_DATABASE !== "true"
+  ) {
     throw new Error("Refusing database outside Arture namespace.");
   }
   if (!global.artureMongoClient) {
